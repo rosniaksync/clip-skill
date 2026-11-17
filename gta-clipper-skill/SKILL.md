@@ -30,7 +30,9 @@ como short 1080x1920 (card de gancho, legenda palavra por palavra, ±10 s) e reg
   (N−1) h menos 5 min (`chunk_overlap_minutes`) até N h, via `download.py --section` (o bloco 1 começa em 0:00
   e o último termina no fim do vídeo). Ex.: 00:00:00-01:00:00, 00:55:00-02:00:00, 01:55:00-03:00:00…
   Vídeo de até 1 h = um bloco só, baixado inteiro (sem `--section`). Descarte cortes repetidos na sobreposição.
-  1 a 3 cortes por bloco, sem forçar.
+- **Quantos shorts:** não há número fixo nem pedido. Entregue todo corte que é bom de verdade pelas regras de
+  `references/viral-rules.md`: se um bloco de 1 h tem 20 momentos bons, entregue 20; se tem 2, entregue 2; se
+  não tem nenhum, diga isso. Nunca complete número com corte fraco.
 - **Bloco por bloco, sem esperar o usuário** (`auto_next_block`): termine o bloco 1 (passos 1 a 7), mostre a
   lista do bloco e siga sozinho para o próximo, até o fim do vídeo. Enquanto um bloco transcreve ou renderiza,
   baixe o próximo. Bloco sem momento bom entrega menos cortes. Avise em uma linha a cada bloco pronto.
@@ -54,7 +56,7 @@ como short 1080x1920 (card de gancho, legenda palavra por palavra, ±10 s) e reg
   (`captions.anchor: "above_card"`). Nunca duas legendas ao mesmo tempo.
 - **Saída:** H.264 / yuv420p / 30 fps / AAC; o script confere cada arquivo e falha se não bater.
 
-## Passo -1 — Receber o link, ver se está ao vivo e perguntar (o usuário só manda o link)
+## Passo -1 — Receber o link e ver se está ao vivo (o usuário só manda o link; sem perguntas)
 
 Não comece a baixar. Primeiro olhe o vídeo sem baixar:
 ```
@@ -71,14 +73,11 @@ Twitch, qual VOD vai ser usado).
   a live ainda está rolando e que dá para rodar de novo depois para o resto. `live_from_start` só é ligado para
   live no ar.
 
-Depois use a ferramenta de perguntas (AskUserQuestion) **uma vez, com uma pergunta só**, com um resumo do vídeo
-(título, canal, duração e quantos blocos de 1 h), primeira opção = recomendada:
-1. **Quantos shorts?** Padrão: 2 por hora de vídeo.
-
-**Não pergunte qual trecho:** é sempre o vídeo inteiro, em blocos de 1 hora (live no ar: tudo o que já passou).
+**Não faça perguntas.** Não pergunte quantos shorts nem qual trecho: é sempre o vídeo inteiro, em blocos de
+1 hora (live no ar: tudo o que já passou), e a quantidade de shorts sai da qualidade (ver "Quantos shorts").
 Também não pergunte sobre permissão de repostagem (o usuário já disse que tem), nome do canal, card, webcam,
-idioma, modelo, cores. Depois da resposta, diga em uma linha o que vai fazer (quantos blocos) e quanto deve
-demorar, e comece. Sem resposta, use o padrão e diga qual usou.
+idioma, modelo, cores. Diga em uma linha o resumo do vídeo (título, canal, duração), quantos blocos vai fazer e
+quanto deve demorar, e comece.
 
 ## Passo 0 — Conferir instalação (primeira vez ou PC novo)
 
@@ -117,7 +116,7 @@ python scripts/read_blocks.py work/<id> --block N    # lê o bloco N (10 min)
 ```
 **Leia todos os blocos, do primeiro ao último.** Procure piadas, reviravoltas, discussões, situações
 inesperadas, histórias com desfecho e reações fortes (`references/viral-rules.md`). Anote cada candidato em
-`cands.json`: `[{"id":1,"start":"00:08:05","end":"00:08:40","why":"..."}]`. Seja generoso (~4x o pedido).
+`cands.json`: `[{"id":1,"start":"00:08:05","end":"00:08:40","why":"..."}]`. Seja generoso: anote tudo que pode ser bom; a seleção final vem depois.
 
 **Apoio, não filtro:** `python scripts/find_hype.py work/<id> --top 15` (áudio, chat da Twitch e "clipa",
 heatmap do YouTube, movimento). Use para conferir seus candidatos e achar trechos que a leitura deixou passar.
@@ -255,8 +254,8 @@ linhas com views preenchidas** (`notion.min_rows_for_patterns`). Com menos, diga
 - **Gameplay solo não tem chat nem webcam:** a leitura da transcrição (se o usuário narra) e os frames viram a
   fonte principal de candidatos (passos 2 a 3b). Use `nocam`.
 - **Música do rádio do jogo** dá claim/mute: pular trechos com música licenciada alta (ver `viral-rules.md`).
-- **Capacidade:** o limite é escolher e conferir, não renderizar. Contar ~4 bons cortes por hora de gameplay
-  gravado. Não force número.
+- **Capacidade:** o limite é escolher e conferir, não renderizar. Não force número: a quantidade
+  de cortes depende só de quantos momentos bons o bloco tem.
 - **Teste cego de calibração (a pedido do usuário):** ele anota os cortes que faria numa live inteira sem me
   mostrar; eu rodo o fluxo e comparamos (coincidências, só dele, só meus, e por quê). Os padrões que ele explicar
   vão para `references/viral-rules.md` e para a memória.
