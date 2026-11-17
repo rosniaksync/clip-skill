@@ -711,6 +711,8 @@ def update_renders(wd, out_dir, clip, res, lang):
         "original_time": f"{hms(cs + off)} a {hms(ce + off)}",
         "file_range_in_source": [round(rs, 2), round(re_, 2)],
         "language": lang or "pt", "origin_language": "PT" if (lang or "pt") == "pt" else "Gringo",
+        "title": clip.get("title", ""), "description": clip.get("description", ""),
+        "hashtags": clip["hashtags"] if isinstance(clip.get("hashtags"), str) else " ".join(clip.get("hashtags") or []),
         "moment_type": clip.get("type"), "video_url": info.get("webpage_url"),
         "channel": info.get("channel") or info.get("uploader"), "platform": info.get("extractor_key"),
         "notion_page_id": clip.get("notion_page_id") or old.get("notion_page_id"),

@@ -184,6 +184,7 @@ Descarte o que não faz sentido sem contexto. Cada corte começa no gancho e ter
   }
 ]
 ```
+- `title`, `description` e `hashtags` são **obrigatórios** em todo corte (vão para o kit e para o Notion).
 - `style`: `"cam"` (com webcam) ou `"nocam"`. `hook` = linha 1 do card, `subhook` = linha 2 (máx. ~5 palavras,
   sem emoji, em português). `title`, `description`, `hashtags` vão para o kit de postagem.
 - `type` (para o Notion): Reação, Fail, Jogada, Piada, História ou Discussão.
@@ -270,6 +271,8 @@ Para cada short renderizado:
    - `Estilo`: cam / nocam
    - `Tipo de momento`: `type` do corte (Reação, Fail, Jogada, Piada, História, Discussão)
    - `Idioma de origem`: PT ou Gringo (`origin_language`)
+   - `Título`, `Descrição`, `Hashtags`: os mesmos do kit de postagem (`title`, `description`, `hashtags`,
+     hashtags separadas por espaço). Sempre preencha os três.
    - `Status`: "Renderizado"
    Grave o id da página criada no corte (`"notion_page_id"` no `clips.json`). Se o corte já tiver
    `notion_page_id` (gancho trocado e renderizado de novo), **atualize essa linha**, não crie outra.
@@ -317,7 +320,7 @@ O Notion não é mexido. Por isso:
 ## Como o usuário edita depois
 
 - **Gancho:** "corte N: GANCHO / SUBGANCHO" (passo 7). **Tempo do corte:** editar `start`/`end` em
-  `clips.json` e rodar `make_shorts.py work/<id> --only N`.
+  `clips.json` e rodar `make_shorts.py work/<id> --only N`. Se mudar título, descrição ou hashtags, atualize também a linha do Notion.
 - **Visual** (cores, tamanhos, posição, logo, nome do canal): `templates/cam.json` ou `nocam.json`.
 - Antes de sobrescrever shorts já aprovados, guarde cópia (ex.: `shorts_antigo/`).
 
