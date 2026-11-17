@@ -707,6 +707,7 @@ def update_renders(wd, out_dir, clip, res, lang):
     data[str(clip["id"])] = {
         "id": clip["id"], "file": res["file"], "style": res["style"],
         "hook": clip.get("hook", ""), "subhook": clip.get("subhook", ""),
+        "hook_text": " ".join(x for x in (clip.get("hook", ""), clip.get("subhook", "")) if x).strip(),
         "suggested_cut_in_file": f"{mmss(cs - rs)} a {mmss(ce - rs)}",
         "original_time": f"{hms(cs + off)} a {hms(ce + off)}",
         "file_range_in_source": [round(rs, 2), round(re_, 2)],
@@ -736,7 +737,7 @@ def write_posting_kit(wd, out_dir, clips, cfg):
           "do corte (quando o vídeo permite), para o ajuste fino no editor.", ""]
     for c in rows:
         r = renders[str(c["id"])]
-        L += [f"## {os.path.basename(r['file'])} — {r['hook']} / {r['subhook']}".rstrip(" /"), "",
+        L += [f"## {os.path.basename(r['file'])} — {r['hook_text']}", "",
               f"- Corte sugerido no arquivo: {r['suggested_cut_in_file']}",
               f"- Horário no original: {r['original_time']}",
               f"- Título: {c.get('title', '')}"]
@@ -828,7 +829,7 @@ def main():
     kit = write_posting_kit(wd, out_dir, all_clips, cfg)
     print(f"✓ {len(done)} shorts → {out_dir}" + (f"  (kit: {kit})" if kit else ""))
     for r in done:
-        print(f"  {os.path.basename(r['file'])} | {r['hook']} / {r['subhook']} | corte sugerido no arquivo: "
+        print(f"  {os.path.basename(r['file'])} | {r['hook_text']} | corte sugerido no arquivo: "
               f"{r['suggested_cut_in_file']} | no original: {r['original_time']}")
 
 

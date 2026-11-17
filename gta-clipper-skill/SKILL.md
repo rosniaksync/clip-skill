@@ -227,7 +227,7 @@ das palavras dentro do tempo da frase.
 
 1. `make_shorts.py work/<id> --preview` → `shorts/preview.jpg` (3 quadros por short). Abra e confira legenda,
    recorte da webcam e card sem cobrir rosto.
-2. No fim de cada bloco, mostre a lista: **arquivo, gancho / subgancho, corte sugerido no arquivo**, e a pasta.
+2. No fim de cada bloco, mostre a lista: **arquivo, gancho (texto único), corte sugerido no arquivo**, e a pasta.
    O `posting-kit.md` tem, por short: título (<70 caracteres), descrição, 5–8 hashtags, corte sugerido no
    arquivo (ex.: "0:10 a 0:47"), horário no original e a ordem sugerida para postar.
 3. No Windows, abra imagens com `Start-Process <png>`; `.mp4` peça para abrir pelo Explorer.
@@ -261,7 +261,8 @@ Para cada short renderizado:
    (link do canal, `channel_url`/`uploader_url` do `info.json`), `Plataforma` (YouTube, Twitch, Kick ou Outro)
    e `Status` "Cortando".
 2. **Linha em "Resultados dos Cortes":**
-   - `Gancho` (título): "GANCHO / SUBGANCHO"
+   - `Gancho` (título): **um texto só**, sem barra: `hook_text` do `renders.json` (linha 1 e linha 2 do card
+     juntas numa frase, ex.: "EXPLODIU TUDO NA CARA DA POLÍCIA")
    - `Canal`: relação com a página do canal
    - `Data do corte`: hoje
    - `Link do vídeo`: `video_url`
