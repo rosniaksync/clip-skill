@@ -186,6 +186,7 @@
     "enabled": true,
     "resultados_data_source": "collection://41b43190-4def-819e-87da-000b0257adc4",
     "canais_data_source": "collection://41a43190-4def-8125-a1bb-000b848717e9",
+    "progresso_data_source": "collection://41b43190-4def-81af-ad5c-000b0f2ff8c8",
     "min_rows_for_patterns": 20
   }
 }

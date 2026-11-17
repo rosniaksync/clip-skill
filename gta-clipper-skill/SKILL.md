@@ -234,10 +234,11 @@ das palavras dentro do tempo da frase.
 ## Passo 6b — Gravar no histórico (fim de CADA bloco, sempre)
 
 ```
-python scripts/progress.py done work/<id>
+python scripts/progress.py done work/<id> --block-minutes <30|60>
 ```
 Grava o trecho do bloco (tempo do original, com o offset real) e os shorts renderizados no histórico do vídeo.
-Rode mesmo quando o bloco não teve nenhum short: assim o trecho conta como já visto.
+Rode mesmo quando o bloco não teve nenhum short: assim o trecho conta como já visto. Depois atualize a linha
+do vídeo em "Progresso dos Vídeos" no Notion (passo 8, item 5).
 
 ## Passo 7 — Trocar gancho (quando o usuário pedir)
 
@@ -251,7 +252,8 @@ O modo bloco por bloco continua sozinho.
 Usa o MCP do Notion do usuário (`claude mcp add --transport http --scope user notion https://mcp.notion.com/mcp`,
 depois `/mcp` para autorizar). Bases em `config.json` → `notion`:
 `resultados_data_source` ("Resultados dos Cortes") e `canais_data_source` ("Canais para Cortes").
-Os dados de cada short estão em `shorts/renders.json`.
+Os dados de cada short estão em `shorts/renders.json`. Base de progresso: `progresso_data_source`
+("Progresso dos Vídeos").
 
 Para cada short renderizado:
 1. **Canal:** procure o canal na base de canais (título `Canal`). Se não existir, crie com `Canal`, `Link`
@@ -273,6 +275,14 @@ Para cada short renderizado:
    `notion_page_id` (gancho trocado e renderizado de novo), **atualize essa linha**, não crie outra.
 3. **Base de canais:** `Cortes feitos` +1 e `Último corte` = hoje (só para linha nova, não para atualização).
 4. Não preencha Views 24h, Views 7d, Retenção %, Postado em, Data da postagem nem Observação (são do usuário).
+5. **Progresso do vídeo** (uma linha por vídeo/live, no fim de cada bloco, depois do `progress.py done`):
+   `python scripts/progress.py notion work/<id>` imprime os campos prontos: `Vídeo`, `Status` (Em andamento /
+   Live continua / Concluído), `Aviso` (ex.: "A live continua. Me mande o link de novo depois que eu continuo de
+   00:35:00, sem repetir."), `Continuar de`, `Cortado até`, `Trechos cortados`, `Shorts feitos`, `Blocos feitos`,
+   `Tamanho do bloco`, `Plataforma`, `Link do vídeo`, `ID do vídeo`, `Última atualização`; e `Canal` = relação
+   com a página do canal. Se `notion_page_id` vier vazio, crie a linha e guarde o id com
+   `progress.py set-notion work/<id> <page_id>`; se vier preenchido, **atualize essa linha** (nunca crie outra).
+   Se o histórico local sumir, procure a linha pelo `ID do vídeo` antes de criar.
 
 Se o Notion não estiver disponível, renderize normal e avise em uma linha ("Notion indisponível: os shorts não
 foram registrados"); não trave.

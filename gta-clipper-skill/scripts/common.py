@@ -123,3 +123,10 @@ def history_summary(hist):
     spans = merge_spans([[b["start"], b["end"]] for b in hist.get("blocks", [])])
     covered = spans[0][1] if spans and spans[0][0] <= 1 else 0.0
     return spans, covered, len(hist.get("clips", []))
+
+
+def continue_from(covered, cfg):
+    """Onde a próxima rodada começa: fim do que já foi coberto menos a sobreposição
+    (no máximo 1/4 do que foi coberto, para uma live recém-começada não refazer tudo)."""
+    ov = min(float(cfg.get("chunk_overlap_minutes", 5)) * 60, covered * 0.25)
+    return max(0.0, covered - ov)

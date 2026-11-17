@@ -35,7 +35,7 @@ import tempfile
 import time
 from urllib.parse import parse_qs, urlparse
 
-from common import (cfg_path, history_path, history_summary, load_config, read_json, secs, ts, twitch_cli_path,
+from common import (cfg_path, continue_from, history_path, history_summary, load_config, read_json, secs, ts, twitch_cli_path,
                     write_json)
 
 LOGIN_HINTS = ("sign in", "age-restricted", "confirm your age", "log in",
@@ -276,9 +276,8 @@ def main():
             hist = read_json(history_path(info.get("extractor_key"), info.get("id"), cfg))
             if hist and hist.get("blocks"):
                 spans, covered, n = history_summary(hist)
-                ov = float(cfg.get("chunk_overlap_minutes", 5)) * 60
                 print(f"Histórico: já cortado {', '.join(f'{ts(s)}–{ts(e)}' for s, e in spans)} ({n} shorts). "
-                      f"Continuar de {ts(max(0.0, covered - ov))}.")
+                      f"Continuar de {ts(continue_from(covered, cfg))}.")
             else:
                 print("Histórico: vídeo novo, nada cortado ainda.")
             return
