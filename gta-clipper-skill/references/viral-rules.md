@@ -2,6 +2,18 @@
 
 Use these to rank candidates. A clip needs at least 2 of them to be worth making.
 
+## How to find candidates (process)
+1. Transcribe the whole block with the `tiny` model (fast; `small` refines only the candidates); read it ALL in 10-minute blocks
+   (`read_blocks.py`), not only around audio/chat peaks. Funny stories and jokes are often said calmly.
+2. While reading, look for: **jokes, twists/reversals, arguments/discussions, unexpected situations,
+   funny stories with a payoff**, plus big reactions.
+3. Extract frames of every candidate (`extract_frames.py`) and look at them: some of the best moments are
+   visual with no speech (crash, chase, absurd scene, jump scare).
+4. Re-transcribe only the candidates with `small`, then pick the final clips.
+5. `find_hype.py` (audio/chat/"clipa") is a **support tool**: use it to cross-check candidates and to catch
+   what reading missed. It never decides alone. A loud peak with nothing funny is dropped; a great
+   story with no peak stays.
+
 ## Moment types that work (best first)
 1. **Big emotional reaction** — screaming, uncontrollable laughter, rage, shock.
    Loud audio spike + streamer voice = gold.

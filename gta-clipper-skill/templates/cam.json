@@ -1,11 +1,11 @@
 {
   "name": "cam",
-  "description": "Estilo neon synthwave com logo. Backup do visual laranja: cam_laranja.json",
+  "description": "Neon synthwave RSK CORTES (logo oficial, tons de sol: azul, roxo, rosa, coral). Backup: cam_gta6_loucuras.json",
   "canvas": {
     "w": 1080,
     "h": 1920
   },
-  "channel_name": "GTA6 LOUCURAS",
+  "channel_name": "RSK CORTES",
   "layout": {
     "cam_height": 768,
     "game_height": 1152,
@@ -24,7 +24,7 @@
       "size": 30,
       "uppercase": true,
       "color": "#FFFFFF",
-      "bg": "#7A2CFF",
+      "bg": "#C02BE8",
       "padding_x": 24,
       "padding_y": 8,
       "overlap": 12,
@@ -34,8 +34,8 @@
       "border_color": "#FFFFFF",
       "border_width": 3,
       "bg_gradient": [
-        "#FF2BD6",
-        "#FF7A00"
+        "#C02BE8",
+        "#FF4F9A"
       ],
       "border_gradient": [
         "#FFFFFF",
@@ -44,14 +44,14 @@
     },
     "box": {
       "bg": "#0A0014",
-      "border_color": "#FF7A00",
+      "border_color": "#FF3DCB",
       "border_width": 5,
       "radius": 26,
       "padding_x": 30,
       "padding_y": 22,
       "line_gap": 8,
       "bg_gradient": [
-        "#12002B",
+        "#14003A",
         "#050008"
       ],
       "bg_image": {
@@ -60,9 +60,10 @@
         "opacity": 0.12
       },
       "border_gradient": [
-        "#7A2CFF",
-        "#FF2BD6",
-        "#FF7A00"
+        "#5B3CFF",
+        "#C02BE8",
+        "#FF3DCB",
+        "#FF6F91"
       ],
       "glow": {
         "radius": 9,
@@ -83,13 +84,14 @@
       },
       "size": 60,
       "min_size": 36,
-      "color": "#CFF6FF"
+      "color": "#FFD7E8"
     },
     "logo": {
       "file": "assets/logo.png",
       "circle": true,
-      "size": 165,
-      "gap": 20
+      "pad": 0.18,
+      "size": 190,
+      "gap": 18
     },
     "text_glow": {
       "radius": 10,

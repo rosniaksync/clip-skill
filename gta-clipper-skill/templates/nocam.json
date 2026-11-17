@@ -1,14 +1,23 @@
 {
   "name": "nocam",
-  "description": "Vídeo SEM webcam: fundo = vídeo ampliado e desfocado, meio = gameplay com leve zoom, título no topo, legenda na faixa desfocada de baixo.",
-  "canvas": { "w": 1080, "h": 1920 },
-  "channel_name": "",
-
-  "layout": {
-    "background": { "blur_radius": 28, "blur_passes": 3, "brightness": -0.12 },
-    "game": { "zoom": 1.15, "y_center": 960, "focus_x": 0.5 }
+  "description": "Sem webcam, RSK CORTES: fundo desfocado, logo redonda no topo, gancho em degradê GTA (rosa→laranja) abaixo dela, gameplay no meio, legenda embaixo.",
+  "canvas": {
+    "w": 1080,
+    "h": 1920
   },
-
+  "channel_name": "RSK CORTES",
+  "layout": {
+    "background": {
+      "blur_radius": 28,
+      "blur_passes": 3,
+      "brightness": -0.12
+    },
+    "game": {
+      "zoom": 1.0,
+      "y_center": 960,
+      "focus_x": 0.5
+    }
+  },
   "title": {
     "y_top": 190,
     "max_width": 980,
@@ -18,34 +27,83 @@
     "outline": 10,
     "outline_color": "#000000",
     "line1": {
-      "font": { "file": "fonts/Montserrat-Black.ttf" },
+      "font": {
+        "file": "fonts/Montserrat-Black.ttf"
+      },
       "size": 92,
       "min_size": 52,
       "color": "#FFFFFF"
     },
     "line2": {
-      "font": { "file": "fonts/Montserrat-Black.ttf" },
+      "font": {
+        "file": "fonts/Montserrat-Black.ttf"
+      },
       "size": 92,
       "min_size": 52,
       "color": "#FFFFFF"
     }
   },
-
   "captions": {
-    "font": { "file": "fonts/Poppins-ExtraBold.ttf" },
+    "font": {
+      "file": "fonts/Poppins-ExtraBold.ttf"
+    },
     "bold": false,
-    "size": 84,
+    "size": 69,
     "uppercase": true,
     "color": "#FFFFFF",
-    "highlight_color": "#FFE600",
+    "highlight_color": "#FE5CCD",
     "highlight_scale": 112,
-    "outline": 8,
+    "outline": 4,
     "outline_color": "#000000",
-    "shadow": 3,
+    "shadow": 1,
     "x": 540,
-    "y": 1560,
     "max_words": 3,
     "max_chars": 16,
-    "max_gap": 0.6
+    "max_gap": 0.6,
+    "y": 1420
+  },
+  "stack": {
+    "y_top": 210,
+    "gap": 136,
+    "logo": {
+      "file": "assets/logo.png",
+      "circle": true,
+      "pad": 0.18,
+      "size": 140,
+      "ring_width": 4,
+      "ring_gradient": [
+        "#FF3DCB",
+        "#FF9A3C"
+      ]
+    },
+    "text": {
+      "uppercase": true,
+      "max_width": 980,
+      "line_gap": 2,
+      "outline": 5,
+      "outline_color": "#000000",
+      "gradient": [
+        "#FF3DCB",
+        "#FF6F91",
+        "#FFB02E"
+      ],
+      "glow_color": "#FF3DCB",
+      "glow_radius": 8,
+      "glow_opacity": 0.8,
+      "line1": {
+        "font": {
+          "file": "fonts/Montserrat-Black.ttf"
+        },
+        "size": 44,
+        "min_size": 26
+      },
+      "line2": {
+        "font": {
+          "file": "fonts/Montserrat-Black.ttf"
+        },
+        "size": 44,
+        "min_size": 26
+      }
+    }
   }
 }

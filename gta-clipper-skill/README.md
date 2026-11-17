@@ -34,16 +34,13 @@ gta-clipper-skill/
 ├── SKILL.md            instruções que o Claude segue (fluxo completo, regras e decisões)
 ├── CLAUDE.md
 ├── config.json         duração, recuo, blocos, sinais e pesos
-├── assets/logo.png     logo oficial (Cortes GTA 6); logo_antiga_circulo.png = versão anterior
+├── assets/logo.png     logo oficial (RSK CORTES); logo_gta6_loucuras.png = versão anterior
 ├── fonts/              Montserrat Black e Poppins ExtraBold (estáticas)
-├── templates/          cam.json (ativo), nocam.json, cam_laranja.json (backup)
-│   └── opcoes/         8 cards com logo e 8 sem logo (copie um para cam.json para aplicar)
+├── templates/          cam.json (ativo), nocam.json, cam_gta6_loucuras.json e cam_laranja.json (backups)
 ├── references/viral-rules.md
-├── catalogo-cards/     imagens com todas as opções de card (com e sem logo)
 ├── tools/              TwitchDownloaderCLI (instalado por scripts/install_twitch_cli.py)
-└── scripts/            download, find_hype, transcribe, make_shorts, check_setup
+└── scripts/            download, transcribe, read_blocks, extract_frames, find_hype, make_shorts, check_setup
 ```
-Catálogo visual dos cards: `C:\cortes\cards\` (veja `TODOS_OS_CARDS.png`).
 
 ## Dicas
 - Neste PC (i5 de 2011, sem GPU) achar os momentos de 1 hora leva ~3,5 min, transcrever os 8 melhores

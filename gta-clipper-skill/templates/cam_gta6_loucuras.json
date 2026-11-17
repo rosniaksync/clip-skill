@@ -5,11 +5,13 @@
     "w": 1080,
     "h": 1920
   },
-  "channel_name": "NOME DO CANAL",
+  "channel_name": "GTA6 LOUCURAS",
   "layout": {
     "cam_height": 768,
     "game_height": 1152,
-    "game_focus_x": 0.5
+    "game_focus_x": 0.5,
+    "scale_flags": "lanczos",
+    "cam_sharpen": "unsharp=5:5:0.7:3:3:0.0"
   },
   "card": {
     "anchor_y": 768,
@@ -21,8 +23,8 @@
       },
       "size": 30,
       "uppercase": true,
-      "color": "#000000",
-      "bg": "#FF7A00",
+      "color": "#FFFFFF",
+      "bg": "#7A2CFF",
       "padding_x": 24,
       "padding_y": 8,
       "overlap": 12,
@@ -30,16 +32,42 @@
       "offset_x": 0,
       "position": "bottom",
       "border_color": "#FFFFFF",
-      "border_width": 4
+      "border_width": 3,
+      "bg_gradient": [
+        "#FF2BD6",
+        "#FF7A00"
+      ],
+      "border_gradient": [
+        "#FFFFFF",
+        "#FFFFFF"
+      ]
     },
     "box": {
-      "bg": "#120800",
+      "bg": "#0A0014",
       "border_color": "#FF7A00",
-      "border_width": 6,
-      "radius": 0,
-      "padding_x": 36,
-      "padding_y": 26,
-      "line_gap": 8
+      "border_width": 5,
+      "radius": 26,
+      "padding_x": 30,
+      "padding_y": 22,
+      "line_gap": 8,
+      "bg_gradient": [
+        "#12002B",
+        "#050008"
+      ],
+      "bg_image": {
+        "file": "assets/logo.png",
+        "blur": 10,
+        "opacity": 0.12
+      },
+      "border_gradient": [
+        "#7A2CFF",
+        "#FF2BD6",
+        "#FF7A00"
+      ],
+      "glow": {
+        "radius": 9,
+        "opacity": 0.8
+      }
     },
     "line1": {
       "font": {
@@ -47,7 +75,7 @@
       },
       "size": 80,
       "min_size": 44,
-      "color": "#FFD400"
+      "color": "#FF4FD8"
     },
     "line2": {
       "font": {
@@ -55,13 +83,17 @@
       },
       "size": 60,
       "min_size": 36,
-      "color": "#FFFFFF"
+      "color": "#CFF6FF"
     },
     "logo": {
       "file": "assets/logo.png",
       "circle": true,
       "size": 165,
       "gap": 20
+    },
+    "text_glow": {
+      "radius": 10,
+      "opacity": 0.7
     }
   },
   "captions": {

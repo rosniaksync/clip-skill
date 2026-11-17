@@ -5,7 +5,7 @@ description: Transforma qualquer live ou vídeo longo (YouTube, Twitch VOD, Kick
 
 # Live → Shorts virais
 
-O usuário cola o link de uma live. Você baixa, acha os melhores momentos, transcreve só o necessário,
+O usuário cola o link de uma live. Você baixa, transcreve (tiny no vídeo todo, small nos candidatos), lê tudo, olha os frames,
 e renderiza cada corte como um short 1080x1920 com card de gancho e legenda palavra por palavra.
 Trabalhe em `work/<id>/` (na pasta do usuário, por exemplo C:\cortes\work\<id>) e entregue em `shorts/`.
 
@@ -23,8 +23,8 @@ Não use `python -I` (ele esconde o Pillow instalado no perfil do usuário).
 - **Blocos de 1 hora** (`chunk_minutes`) com 5 min de sobreposição (`chunk_overlap_minutes`) via
   `download.py --section`; descartar cortes repetidos na sobreposição. Em lives longas, 1 a 3 cortes
   por bloco, sem forçar número. O usuário costuma pedir "N shorts por hora".
-- **Bloco por bloco, sem esperar o usuário** (`auto_next_block`): termine o bloco 1 (baixar, achar momentos,
-  transcrever os melhores trechos, escolher, renderizar), **entregue os cortes dele com o preview** e então
+- **Bloco por bloco, sem esperar o usuário** (`auto_next_block`): termine o bloco 1 (baixar, transcrever com tiny, ler em blocos de 10 min,
+  olhar frames, retranscrever candidatos com small, escolher, renderizar), **entregue os cortes dele com o preview** e então
   siga sozinho para o bloco 2, e assim até o fim do vídeo. Enquanto um bloco transcreve ou renderiza, baixe
   o próximo (download só usa rede). Bloco sem momento bom entrega menos cortes (não force). Avise em uma
   linha a cada bloco pronto, com o caminho da pasta.
@@ -36,21 +36,16 @@ Não use `python -I` (ele esconde o Pillow instalado no perfil do usuário).
 
 ## Identidade visual (referência de tudo)
 
-- **Logo oficial:** `assets/logo.png` (arte quadrada "Cortes GTA 6": claquete, pôr do sol, palmeiras,
-  carro). No card ela entra **recortada em círculo**. A versão circular antiga: `assets/logo_antiga_circulo.png`.
+- **Logo oficial: "RSK CORTES"** (`assets/logo.png`: letras RSK com cidade ao pôr do sol, coroa, palmeiras,
+  claquete; fundo preto). No card entra **redonda** (`circle: true`) com margem preta (`pad` 0.18, tamanho 190),
+  para a arte aparecer inteira sem cortar as pontas do V. Logo antiga "Cortes GTA 6": `assets/logo_gta6_loucuras.png`.
 - **Fontes** (estáticas, em `fonts/`, apontadas direto nos templates): Montserrat Black (gancho,
   subgancho, etiqueta do card, título do `nocam`) e Poppins ExtraBold (legenda). Aprovadas pelo usuário.
-- **Template ativo `templates/cam.json` = "synthwave + laranja na borda"** (opção 08 do catálogo): caixa
-  escura em degradê, borda neon roxo→rosa→laranja com brilho, logo redonda à esquerda, gancho rosa neon
-  (#FF4FD8), subgancho azul-gelo (#CFF6FF), etiqueta do canal embaixo do card (degradê rosa→laranja,
-  borda branca). Backup do visual laranja antigo: `templates/cam_laranja.json`.
-- **Catálogo de opções de card** (o usuário ainda está escolhendo): `C:\cortes\cards\` (com logo) e
-  `C:\cortes\cards\sem_logo\` (sem logo): 8 cards cada, folha `TODOS_OS_CARDS.png`, uma imagem por card
-  e `templates/` com o JSON de cada um. Cópia dos JSONs em `templates/opcoes/`. **Para aplicar o card N:**
-  copie `templates/opcoes/<com_logo|sem_logo>/NN-..._cam.json` para `templates/cam.json`, ponha o nome do
-  canal em `channel_name` e renderize de novo.
-- **Nome do canal** (`channel_name` no `cam.json`): o usuário ainda não decidiu. Hoje está "GTA6 LOUCURAS".
-  Pergunte antes de entregar versão final.
+- **Template ativo `templates/cam.json` = "RSK CORTES, cores da logo"**: caixa escura em degradê, borda neon
+  azul (#4B5BFF) → roxo (#C02BE8) → rosa (#FF3DCB) → laranja (#FF9A3C) com brilho, logo à esquerda, gancho rosa
+  neon (#FF4FD8), subgancho azul-gelo (#CFE3FF), etiqueta do canal embaixo (degradê roxo→rosa, borda branca).
+  Backup do visual anterior: `templates/cam_gta6_loucuras.json`; laranja antigo: `cam_laranja.json`.
+- **Nome do canal** (`channel_name`): **RSK CORTES** (definido pelo usuário).
 - **Legenda do `cam`:** pequena-média (tamanho 69), palavra em destaque rosa (#FE5CCD), posicionada
   `gap` px (30) acima do topo do card (`captions.anchor: "above_card"`). Nunca duas legendas ao mesmo tempo.
 
@@ -86,38 +81,57 @@ Gera `source.mp4` (até 1080p), `info.json`, `chat.json` e, com `--section`, `se
 Lives de 3h+: pergunte qual trecho (ou use blocos de 1 hora). Login/idade: veja `C:\cortes\COMO-USAR.md`
 (YouTube usa cookies copiados e plugin de PO token).
 
-## Passo 2 — Achar os momentos ANTES de transcrever (caminho rápido, padrão)
+## Passo 2 — Transcrever o bloco inteiro com o modelo tiny (rápido)
 
 ```
-python scripts/find_hype.py work/<id> --top 10
+python scripts/transcribe.py work/<id>/source.mp4 --model tiny --beam 1 --language pt
 ```
-Funciona **sem transcrição**. Sinais (pesos e listas em `config.json` → `hype`):
-- **Principais:** volume do áudio (picos de grito/risada) e chat (volume + reações `kk`, `lul`, `omegalul`...).
-- **"clipa" no chat pesa mais** (`clip_call_words`): é o público apontando o momento. O reforço cresce com
-  o número de mensagens na janela (`clip_calls_full_at`), para uma só não dominar.
-- **Palavras são só reforço** (peso baixo): o modelo pode escrever palavrão diferente ou cortar a palavra.
-- **Filtro de gameplay:** janelas com imagem parada (menu, carregando) ficam de fora
-  (`motion_gate_percentile`, 15%).
-- **Texto normalizado antes de comparar:** minúsculo, sem acento, letras repetidas reduzidas
-  (`caraaaalho` → `caralho`, `kkkkkkk` → `kk`).
-- Palavras mais frequentes de um momento (fala + chat): `find_hype.py work/<id> --words 00:08:05-00:08:35`.
+A escolha dos cortes parte da **transcrição completa**, não dos picos. Gera `transcript.json`/`transcript.txt`
+(modelo `tiny` por padrão, `transcribe_fast` no `config.json`: precisão baixa, serve só para ler e achar
+candidatos, e o `small` refaz os escolhidos no passo 3c). Se o texto vier ilegível a ponto de esconder piadas,
+suba para `base` no config. Dica: enquanto transcreve o bloco atual, o download do próximo pode rodar junto.
 
-## Passo 3 — Transcrever só os melhores trechos
+## Passo 3 — Ler tudo em blocos de 10 minutos e listar candidatos
 
 ```
-python scripts/transcribe.py work/<id>/source.mp4 --windows work/<id>/hype.json --top 8 --pad 20 --model small --language pt
+python scripts/read_blocks.py work/<id>              # lista os blocos
+python scripts/read_blocks.py work/<id> --block N    # lê o bloco N (10 min)
 ```
-`--top` = cerca de 4x o número de shorts desejados (sobra opção de escolha; se nada prestar, transcreva
-mais 4). O modelo carrega uma vez, os trechos são unidos e mesclados em `transcript.json`/`transcript.txt`.
-Estenda um trecho com `--range S-E`. Em PC rápido ou com GPU (CUDA é detectada sozinha), pode transcrever
-tudo (`--model small`). Plano B lento: transcrição da hora toda com `--model base --beam 1`, depois refinar
-os cortes escolhidos com `--model small --range S-E` (a legenda precisa de palavras precisas).
+**Leia todos os blocos, do primeiro ao último**, sem pular nem ler só ao redor dos picos. Procure:
+piadas, reviravoltas, discussões, situações inesperadas, histórias engraçadas (com desfecho) e reações
+fortes. Anote cada candidato (início, fim, por que é bom) numa lista `cands.json`:
+`[{"id":1,"start":"00:08:05","end":"00:08:40","why":"..."}]`. Seja generoso aqui (cerca de 4x o número
+de shorts pedidos); a seleção final vem depois.
+
+**Apoio, não filtro:** rode `python scripts/find_hype.py work/<id> --top 15` (áudio, chat, "clipa",
+movimento) e use só para (a) conferir o chat/áudio dos seus candidatos e (b) achar trechos que a leitura
+deixou passar. Pico sem graça na leitura é descartado; candidato bom sem pico **fica**. Palavras mais
+frequentes de um momento: `find_hype.py work/<id> --words 00:08:05-00:08:35`.
+
+## Passo 3b — Olhar os frames dos candidatos
+
+```
+python scripts/extract_frames.py work/<id> --candidates work/<id>/cands.json --frames 6
+```
+Gera `work/<id>/frames/cand<N>.jpg` (folha com 6 quadros). **Abra e analise as imagens** (Read): pega
+momentos visuais sem fala (batida, explosão, fuga, susto, cena absurda) e confirma ou derruba o candidato.
+Se a leitura do bloco trouxe pouca coisa, extraia frames também de picos do `find_hype.py` que ficaram sem fala.
+
+## Passo 3c — Retranscrever só os candidatos com o modelo small
+
+```
+python scripts/transcribe.py work/<id>/source.mp4 --candidates work/<id>/cands.json --pad 10 --model small --language pt
+```
+O `small` substitui, dentro de `transcript.json`, só os trechos candidatos (palavras precisas para a legenda
+e para ajustar `start`/`end` em fronteiras de palavra). O resto continua com o `tiny`. Se o Aspire 16 tiver GPU NVIDIA (CUDA é
+detectada sozinha), dá para usar `small` na transcrição inteira.
 
 ## Passo 4 — Escolher os cortes e escrever `clips.json`
 
-**Leia você mesmo** a transcrição dos trechos (use `references/viral-rules.md`): procure história com
-desfecho, piada, reação forte. Compare com o chat. Descarte pico sem graça.
-Cada corte: começa no gancho, termina logo após o desfecho, faz sentido sem contexto.
+Releia os candidatos já com o `small` e com os frames na cabeça (use `references/viral-rules.md`).
+Escolha os melhores pela história/graça, não pelo volume. Compare com o chat. Descarte o que não faz
+sentido sem contexto.
+Cada corte: começa no gancho, termina logo após o desfecho.
 
 ```json
 [
@@ -129,7 +143,7 @@ Cada corte: começa no gancho, termina logo após o desfecho, faz sentido sem co
     "hook": "EU TAVA NO FLOW STATE",
     "subhook": "PEGUEI TODAS AS BOLAS",
     "title": "Ele entrou no flow state e pegou todas as bolas 😂 #alanzoka",
-    "reason": "pico de áudio + chat em KKKK",
+    "reason": "piada + reviravolta; chat em KKKK",
     "score": 9
   }
 ]
@@ -155,14 +169,16 @@ Olhe e decida:
 - **`cam`:** topo 768px = webcam preenchendo a largura; baixo 1152px = gameplay recortada para preencher a
   largura; o card (caixa do gancho + etiqueta do canal) **centrado na divisão (y=768)** durante o vídeo todo;
   legenda pequena acima do card.
-- **`nocam`:** fundo = vídeo ampliado e desfocado; meio = gameplay com leve zoom; título branco, caixa alta,
-  contorno preto, 2 linhas, no topo; legenda na faixa desfocada de baixo.
+- **`nocam`** (layout "stack", chave `stack` em `nocam.json`): fundo = vídeo ampliado e desfocado (em cima
+  e embaixo); **logo RSK redonda com anel rosa→laranja centralizada no topo**, **gancho logo abaixo em
+  degradê GTA (rosa→laranja) com contorno preto e brilho**, sem caixa; gameplay no meio sem zoom
+  (`zoom` 1.0); legenda rosa embaixo (y 1420). Título branco antigo: `templates/nocam_antigo.json`.
 - **Qualidade da webcam:** o recorte é esticado (~2,9x), então o template usa escalonamento Lanczos + leve
   nitidez (`layout.scale_flags`, `layout.cam_sharpen`). O limite real é a resolução da webcam na origem.
 - Saída sempre H.264 yuv420p 30fps + áudio AAC normalizado; o script confere cada arquivo e falha se não bater.
 - O card aceita no template: degradê, imagem de fundo escurecida, borda em degradê, brilho, brilho no texto,
   logo (redonda ou arredondada), etiqueta em cima ou embaixo. Tudo opcional e configurado no JSON.
-- Tempo neste PC (i5-2400): render de um corte de ~28s leva ~40-50s; achar os momentos de 1h ~3,5 min.
+- Tempo no PC antigo (i5-2400, será trocado pelo Aspire 16: medir de novo): render de um corte de ~28s leva ~40-50s; achar os momentos de 1h ~3,5 min.
 
 ## Passo 6 — Conferir e entregar
 
@@ -171,6 +187,21 @@ Olhe e decida:
 2. `shorts/posting-kit.md`: por short, título (<70 caracteres), descrição curta, 5–8 hashtags e qual postar primeiro.
 3. Diga ao usuário onde está a pasta e quais postaria primeiro. No Windows, abra imagens com
    `Start-Process <png>`; abrir `.mp4` por Start-Process falha, peça para abrir pelo Explorer.
+
+## Gameplay solo (lançamento do GTA 6, 19/11/2026) e calibração
+
+- **Gameplay solo não tem chat nem webcam:** o `find_hype.py` perde o sinal principal. Nesse caso a leitura da
+  transcrição (se o usuário narra) e os frames viram a fonte principal de candidatos (passos 2 a 3b). Use `nocam`.
+- **Música do rádio do jogo** dá claim/mute: pular trechos com música licenciada alta (ver `viral-rules.md`).
+- **Capacidade (estimativa, medir no Aspire 16 quando chegar):** com qualidade, ~10-15 shorts por hora de
+  trabalho no Aspire e ~6-10 no PC antigo (i5-2400); o limite é escolher e conferir, não renderizar. Contar ~4
+  bons cortes por hora de gameplay gravado (50-100 shorts = 10-25 h de material). Não force número.
+- **Teste cego de calibração (a pedido do usuário):** ele escolhe uma live inteira e anota os cortes que faria
+  (início, fim, motivo, e o que descartou de propósito) **sem me mostrar**. Eu rodo o fluxo completo sobre o
+  link, entrego os meus, e comparamos: coincidências, só dele, só meus, e o porquê de cada diferença. Os
+  padrões que ele explicar vão para `references/viral-rules.md` e para a memória. Repetir com outra live.
+- **Postagem:** espalhar os shorts ao longo dos dias em vez de postar tudo de uma vez; os melhores primeiro.
+- **Ideia pendente:** ler marcadores de capítulo do OBS (ou "clipa" falado) como candidatos de maior peso.
 
 ## Como o usuário edita depois
 

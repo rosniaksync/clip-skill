@@ -52,6 +52,7 @@ def main():
     ap.add_argument("--windows", help="hype.json from find_hype.py: transcribe its top candidates")
     ap.add_argument("--top", type=int, default=8, help="with --windows: how many candidates")
     ap.add_argument("--pad", type=float, default=20, help="with --windows: seconds added before/after each")
+    ap.add_argument("--candidates", help="JSON list of {start,end} (seconds or hh:mm:ss): transcribe only these (refine pass)")
     a = ap.parse_args()
 
     try:
@@ -72,6 +73,9 @@ def main():
         total = float(subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of",
                                       "csv=p=0", a.video], capture_output=True, text=True).stdout.strip() or 0)
         ranges += [(max(0, c["start"] - a.pad), min(total, c["end"] + a.pad)) for c in cands]
+    if a.candidates:
+        for c in json.load(open(a.candidates, encoding="utf-8")):
+            ranges.append((max(0, sec(c["start"]) - a.pad), sec(c["end"]) + a.pad))
     ranges = merge_ranges(ranges) if ranges else [[0.0, None]]   # None = whole video
 
     device, ctype = "cpu", "int8"

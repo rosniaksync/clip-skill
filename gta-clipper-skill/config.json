@@ -10,8 +10,9 @@
   "chunk_overlap_minutes": 5,
   "max_parallel_jobs": 2,
   "transcribe_fast": {
-    "model": "base",
-    "beam": 1
+    "model": "tiny",
+    "beam": 1,
+    "note": "passada completa só para ler e achar candidatos; se errar muito, suba para base"
   },
   "transcribe_refine": {
     "model": "small",

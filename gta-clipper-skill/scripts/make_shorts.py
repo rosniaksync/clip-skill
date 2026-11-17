@@ -153,6 +153,11 @@ def load_logo(spec, size):
     im = Image.open(skill_path(spec["file"])).convert("RGBA")
     if spec.get("crop"):
         im = im.crop(tuple(spec["crop"]))
+    if spec.get("pad"):   # fit a square logo inside the circle: black margin so the corners are not cut
+        side = int(im.width * (1 + spec["pad"]))
+        bgc = Image.new("RGBA", (side, side), im.getpixel((2, 2)))
+        bgc.alpha_composite(im, ((side - im.width) // 2, (side - im.height) // 2))
+        im = bgc
     if spec.get("circle"):
         m = Image.new("L", im.size, 0)
         ImageDraw.Draw(m).ellipse([0, 0, im.width - 1, im.height - 1], fill=255)
@@ -282,6 +287,64 @@ def render_card(tpl, clip, tdir, W):
     if c.get("anchor_on", "box") == "card":     # centre the WHOLE card (box + tag) on anchor_y
         return img, m + (extra + box_h) // 2, m
     return img, top + box_h // 2, m
+
+
+def render_stack(tpl, clip, tdir, W):
+    """nocam 'stack' layout: round logo (with ring) centred, hook text under it with a gradient fill
+    (GTA sunset), black outline and glow. No box. Returns the overlay image."""
+    from PIL import ImageChops, ImageFilter
+    st = tpl["stack"]
+    lg_spec, t = st["logo"], st["text"]
+    up = t.get("uppercase", True)
+    texts = [clean_text(x, up) for x in lines_of(clip)]
+    specs = [t["line1"], t["line2"]]
+    outline = t["outline"]
+    items = [(x, fit_font(x, sp["font"], sp["size"], sp["min_size"], t["max_width"], tdir, outline))
+             for x, sp in zip(texts, specs) if x]
+    ring = lg_spec.get("ring_width", 0)
+    size = lg_spec["size"]
+    boxes = [f.getbbox(x, stroke_width=outline) for x, f in items]
+    th = sum(b[3] - b[1] for b in boxes) + t["line_gap"] * max(len(items) - 1, 0)
+    glow_m = 30
+    H = size + 2 * ring + (st["gap"] + th if items else 0) + 2 * glow_m
+    img = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    # logo + ring
+    full = size + 2 * ring
+    cx0 = (W - full) // 2
+    if ring:
+        rg = grad_img(full, full, lg_spec.get("ring_gradient", ["#FF4FD8", "#FF9A3C"]), False).convert("RGBA")
+        mk = Image.new("L", (full * 4, full * 4), 0)
+        ImageDraw.Draw(mk).ellipse([0, 0, full * 4 - 1, full * 4 - 1], fill=255)
+        rg.putalpha(mk.resize((full, full), Image.LANCZOS))
+        gl = rg.filter(ImageFilter.GaussianBlur(10))
+        img.alpha_composite(gl, (cx0, glow_m)); img.alpha_composite(rg, (cx0, glow_m))
+    lg = load_logo(lg_spec, size)
+    img.alpha_composite(lg, (cx0 + ring, glow_m + ring))
+    # text
+    y = glow_m + full + st["gap"]
+    mask = Image.new("L", (W, H), 0)
+    md = ImageDraw.Draw(mask)
+    ol = Image.new("L", (W, H), 0)
+    od = ImageDraw.Draw(ol)
+    for (x, f), b in zip(items, boxes):
+        lw = b[2] - b[0]
+        px = (W - lw) // 2 - b[0]
+        md.text((px, y - b[1]), x, font=f, fill=255)
+        od.text((px, y - b[1]), x, font=f, fill=255, stroke_width=outline)
+        y += b[3] - b[1] + t["line_gap"]
+    if items:
+        top = glow_m + full + st["gap"]
+        grad = grad_img(W, th + 4, t["gradient"], False).convert("RGBA")
+        gimg = Image.new("RGBA", (W, H), (0, 0, 0, 0)); gimg.paste(grad, (0, top - 2))
+        glow = Image.new("RGBA", (W, H), hex_rgb(t.get("glow_color", "#FF3DCB")) + (255,))
+        ga = ol.filter(ImageFilter.GaussianBlur(t.get("glow_radius", 14)))
+        glow.putalpha(ga.point(lambda v: int(v * t.get("glow_opacity", 0.8))))
+        img.alpha_composite(glow)
+        black = Image.new("RGBA", (W, H), hex_rgb(t["outline_color"]) + (255,)); black.putalpha(ol)
+        img.alpha_composite(black)
+        gimg.putalpha(ImageChops.multiply(gimg.getchannel("A"), mask))
+        img.alpha_composite(gimg)
+    return img, glow_m
 
 
 def render_title(tpl, clip, tdir):
@@ -444,7 +507,10 @@ def render(workdir, clip, words, args, setup, src_w, src_h, tdir, out_dir):
     try:
         # --- title overlay (PNG) for the whole clip
         overlay_png, overlay_xy, img, card_margin = None, (0, 0), None, 0
-        if style == "cam":
+        if style == "nocam" and "stack" in tpl:
+            img, gm = render_stack(tpl, clip, tdir, W)
+            overlay_xy = (0, tpl["stack"]["y_top"] - gm)
+        elif style == "cam" or "card" in tpl:   # nocam can also use the card (logo + channel tag) instead of the white title
             r = render_card(tpl, clip, tdir, W)
             if r:
                 img, box_cy, card_margin = r
