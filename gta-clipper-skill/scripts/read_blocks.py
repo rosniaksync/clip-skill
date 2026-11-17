@@ -2,7 +2,7 @@
 """Print transcript.txt in blocks of N minutes (default 10) so the whole video is read, not just the peaks.
 
 Usage: read_blocks.py work/<id>                 # lists the blocks and their line counts
-       read_blocks.py work/<id> --block 3       # prints block 3 (1-based), chat volume per minute appended
+       read_blocks.py work/<id> --block 3       # prints block 3 (1-based)
        read_blocks.py work/<id> --minutes 10
 """
 import argparse, json, os, re
@@ -25,6 +25,6 @@ for t, ln in lines:
     blocks.setdefault(int(t // size) + 1, []).append(ln)
 if a.block is None:
     for b, ls in sorted(blocks.items()):
-        print(f"block {b}: {len(ls)} lines  (starts {int((b-1)*size//60)} min)")
+        print(f"bloco {b}: {len(ls)} linhas  (começa em {int((b-1)*size//60)} min)")
 else:
     print("\n".join(blocks.get(a.block, [])))

@@ -28,11 +28,11 @@ def main():
     rel = json.load(api)
     hint = asset_hint()
     asset = next(a for a in rel["assets"] if a["name"].startswith("TwitchDownloaderCLI") and hint + ".zip" in a["name"])
-    print("Downloading", asset["name"], "...")
+    print("Baixando", asset["name"], "...")
     data = urllib.request.urlopen(asset["browser_download_url"]).read()
     os.makedirs(DEST, exist_ok=True)
     zipfile.ZipFile(io.BytesIO(data)).extractall(DEST)
-    print("OK ->", DEST)
+    print("OK →", DEST)
 
 
 if __name__ == "__main__":

@@ -2,25 +2,26 @@
 
 ## Como está configurado
 
-O `download.py` da skill (`C:\Users\User\.claude\skills\gta-clipper-skill\scripts\download.py`) sempre:
+O `download.py` da skill sempre (os caminhos ficam em `config.json` → `paths` da skill):
 
 - usa o **Node** como runtime JavaScript (resolve os desafios de assinatura do YouTube);
 - usa o plugin **bgutil-ytdlp-pot-provider** em modo script (gera o PO token sem servidor).
-  O gerador fica em `C:\Users\User\bgutil-ytdlp-pot-provider\server\build\generate_once.js`;
+  O gerador fica em `paths.pot_script` (padrão: `~/bgutil-ytdlp-pot-provider/server/build/generate_once.js`);
 - tenta baixar **sem cookies** primeiro;
 - se o vídeo pedir login ou verificação de idade, usa uma **cópia temporária** de
-  `C:\cortes\cookies-master.txt` e apaga a cópia no fim. O original nunca é aberto pelo yt-dlp,
+  `paths.cookies_master` (aqui: `C:\cortes\cookies-master.txt`) e apaga a cópia no fim. O original nunca é aberto pelo yt-dlp,
   porque o yt-dlp reescreve (e acaba invalidando) o arquivo de cookies que recebe;
 - baixa a **melhor qualidade até 1080p** (vídeo + áudio, saída em MP4).
 
 Uso básico:
 
 ```
-python C:\Users\User\.claude\skills\gta-clipper-skill\scripts\download.py "<URL>" --out work\<id>
+python <pasta-da-skill>\scripts\download.py "<URL>" --out work\<id>
 ```
 
-Opções úteis: `--max-height 720`, `--section 00:10:00-00:40:00`, `--no-chat`,
-`--cookies <outro-arquivo>` (também usa só uma cópia).
+Opções úteis: `--probe` (só olha, não baixa), `--max-height 720`, `--section 00:10:00-00:40:00`,
+`--no-chat`, `--cookies <outro-arquivo>` (também usa só uma cópia).
+YouTube não baixa chat; quando existe, salva o mapa de "mais repetidos" em `heatmap.json`.
 
 ## Sintomas de cookies expirados
 
@@ -38,7 +39,7 @@ Vídeos públicos normais devem baixar sem cookies. Se até eles falharem, vá p
    "Get cookies.txt LOCALLY" (formato Netscape).
 4. **Feche a janela anônima sem abrir o YouTube de novo.** O YouTube rotaciona os cookies de abas abertas
    e isso invalida o arquivo exportado.
-5. Salve o arquivo como `C:\cortes\cookies-master.txt`. Ele deve ter dezenas de linhas e
+5. Salve o arquivo no caminho de `paths.cookies_master` (aqui: `C:\cortes\cookies-master.txt`). Ele deve ter dezenas de linhas e
    incluir `SID` e `__Secure-3PSID`.
 6. Faça uma cópia de segurança (por exemplo `cookies-master.bak.txt`) para poder restaurar.
 
@@ -48,7 +49,7 @@ Não use o `cookies.txt` antigo de `C:\cortes`: o yt-dlp o reescreveu várias ve
 
 - **Só aparecem miniaturas ou 360p:** atualize o yt-dlp e os componentes:
   `python -m pip install -U --pre "yt-dlp[default]" yt-dlp-ejs bgutil-ytdlp-pot-provider`.
-- **Aviso de que o PO token script não foi encontrado:** refaça o build do gerador:
+- **Aviso de que o PO token script não foi encontrado:** rode `scripts/check_setup.py` (mostra o comando) ou refaça o build:
   `cd %USERPROFILE%\bgutil-ytdlp-pot-provider\server` e depois `npm ci` e `npx tsc`.
   A versão do repositório deve ser a mesma do plugin (`pip show bgutil-ytdlp-pot-provider`).
 - **Erro no faster-whisper (`metadata_errors`):** o pacote `av` está novo demais. Use

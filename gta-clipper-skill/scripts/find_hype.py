@@ -1,16 +1,17 @@
 #!/usr/bin/env python3
-"""Score every moment of the stream for 'hype' using objective signals.
+"""Sinais de apoio para achar momentos (nunca decidem sozinhos: a leitura da transcrição decide).
 
-Signals (each z-scored, then combined):
-  - audio: loudness spikes vs. the stream's own baseline (screams, laughs, explosions)
-  - chat: volume, reaction spam and 'clipa' calls (only if chat.json exists); 'clipa' weighs most
-  - speech: rate + excited words = weak reinforcement (the model may spell or cut swear words)
-  Text is normalised first (lowercase, no accents, repeated letters collapsed).
-  Word lists and weights live in config.json -> hype.
+Sinais (cada um em z-score, depois somados com os pesos de config.json -> hype.weights):
+  - audio: picos de volume em relação à própria live (grito, risada, explosão)
+  - chat (só Twitch, chat.json): volume, spam de reação e pedidos de "clipa" (o mais forte)
+  - heatmap (só YouTube, heatmap.json): mapa de "mais repetidos", convertido para o tempo do arquivo
+    com o offset real do section.json
+  - fala: ritmo + palavras de empolgação = reforço fraco
+  Texto normalizado antes (minúsculo, sem acento, letras repetidas reduzidas).
 
-Usage: find_hype.py work/<id> [--window 30] [--top 25]
-       find_hype.py work/<id> --words 00:08:05-00:08:35   # most frequent words in a window
-Writes hype.json and prints the top candidate windows with transcript snippets.
+Uso: find_hype.py work/<id> [--window 30] [--top 25]
+     find_hype.py work/<id> --words 00:08:05-00:08:35   # palavras mais frequentes (tempo do arquivo)
+Grava hype.json e mostra as melhores janelas com trecho da transcrição.
 """
 import argparse
 import json
@@ -22,12 +23,11 @@ import unicodedata
 
 import numpy as np
 
-SKILL_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+from common import load_config, section_offset, secs, ts
 
 
 def load_hype_cfg():
-    with open(os.path.join(SKILL_DIR, "config.json"), encoding="utf-8") as f:
-        return json.load(f)["hype"]
+    return load_config()["hype"]
 
 
 def norm(text):
@@ -51,11 +51,6 @@ def tokens(text):
     return re.findall(r"[a-z0-9]+", norm(text))
 
 
-def ts(s):
-    s = int(s)
-    return f"{s // 3600:02d}:{s % 3600 // 60:02d}:{s % 60:02d}"
-
-
 def audio_db_per_sec(video):
     sr = 8000
     p = subprocess.Popen(["ffmpeg", "-v", "error", "-i", video, "-vn", "-ac", "1", "-ar", str(sr),
@@ -77,7 +72,7 @@ def audio_db_per_sec(video):
 
 
 def chat_per_sec(path, n, offset, cfg):
-    """per-second chat volume, reaction count and 'clipa' calls (texts normalised first)."""
+    """chat da Twitch por segundo do arquivo: volume, reações e pedidos de 'clipa' (texto normalizado)."""
     msgs = np.zeros(n); hype = np.zeros(n); clips = np.zeros(n)
     if not os.path.exists(path):
         return None, None, None
@@ -94,28 +89,34 @@ def chat_per_sec(path, n, offset, cfg):
                 clips[i] += 1
 
     with open(path, encoding="utf-8") as f:
-        head = f.read(200)
-        f.seek(0)
-        if '"source": "twitch"' in head:  # normalised Twitch chat from download.py
-            for m in json.load(f)["messages"]:
-                add(m["t"], m.get("text") or "")
-            return msgs, hype, clips
-        for line in f:  # YouTube live_chat replay (one JSON per line)
-            try:
-                d = json.loads(line)
-                act = d.get("replayChatItemAction", {})
-                t = int(act.get("videoOffsetTimeMsec", 0)) / 1000.0
-                text = ""
-                for a_ in act.get("actions", []):
-                    item = a_.get("addChatItemAction", {}).get("item", {})
-                    r = item.get("liveChatTextMessageRenderer") or item.get("liveChatPaidMessageRenderer")
-                    if r:
-                        text = "".join(run.get("text", run.get("emoji", {}).get("shortcuts", [""])[0])
-                                       for run in r.get("message", {}).get("runs", []))
-            except Exception:
-                continue
-            add(t, text)
+        try:
+            data = json.load(f)
+        except ValueError:
+            data = None
+    if not isinstance(data, dict) or data.get("source") != "twitch":   # só o chat da Twitch (download.py)
+        return None, None, None
+    for m in data.get("messages", []):
+        add(m["t"], m.get("text") or "")
     return msgs, hype, clips
+
+
+def heatmap_per_sec(path, n, offset):
+    """heatmap do YouTube (tempos absolutos do original) -> valor por segundo do arquivo. None se não houver."""
+    if not os.path.exists(path):
+        return None
+    with open(path, encoding="utf-8") as f:
+        pts = json.load(f).get("points") or []
+    out = np.zeros(n)
+    hit = False
+    for p in pts:
+        if p.get("start") is None or p.get("end") is None:
+            continue
+        a, b = int(np.floor(p["start"] - offset)), int(np.ceil(p["end"] - offset))
+        a, b = max(a, 0), min(b, n)
+        if a < b:
+            out[a:b] = float(p.get("value") or 0)
+            hit = True
+    return out if hit else None
 
 
 def motion_per_sec(video, n):
@@ -149,31 +150,35 @@ def window_sum(x, w):
 
 
 def top_words(workdir, rng, cfg, n=15):
+    """Palavras mais frequentes da fala (e do chat da Twitch, se houver) numa janela em TEMPO DO ARQUIVO."""
     from collections import Counter
-
-    def sec(t):
-        v = 0.0
-        for p in t.split(":"):
-            v = v * 60 + float(p)
-        return v
-    s0, e0 = (sec(x) for x in rng.split("-"))
+    s0, e0 = (secs(x) for x in rng.split("-"))
     stop = {norm(w) for w in cfg["stopwords"]}
-    sec_path = os.path.join(workdir, "section.json")
-    off = json.load(open(sec_path))["offset"] if os.path.exists(sec_path) else 0.0
+    off = section_offset(workdir)
     sp, ch = Counter(), Counter()
-    tr = json.load(open(os.path.join(workdir, "transcript.json"), encoding="utf-8"))
+    with open(os.path.join(workdir, "transcript.json"), encoding="utf-8") as f:
+        tr = json.load(f)
     for w in tr["words"]:
-        if s0 <= w["s"] + off < e0:
+        if s0 <= w["s"] < e0:
             sp.update(t for t in tokens(w["w"]) if t not in stop)
     cp = os.path.join(workdir, "chat.json")
+    has_chat = False
     if os.path.exists(cp):
-        for m in json.load(open(cp, encoding="utf-8")).get("messages", []):
-            if s0 <= m["t"] < e0 and not (m.get("text") or "").startswith("!"):
-                ch.update(t for t in tokens(m["text"]) if t not in stop)
-    fmt = lambda c: ", ".join(f"{w} ({k})" for w, k in c.most_common(n))
-    print(f"Janela {rng} (texto normalizado: minusculo, sem acento, letras repetidas reduzidas)")
+        with open(cp, encoding="utf-8") as f:
+            try:
+                chat = json.load(f)
+            except ValueError:
+                chat = None
+        if isinstance(chat, dict) and chat.get("source") == "twitch":
+            has_chat = True
+            for m in chat.get("messages", []):
+                if s0 <= m["t"] - off < e0 and not (m.get("text") or "").startswith("!"):
+                    ch.update(t for t in tokens(m["text"]) if t not in stop)
+    fmt = lambda c: ", ".join(f"{w} ({k})" for w, k in c.most_common(n)) or "(nada)"
+    print(f"Janela {rng} (texto normalizado: minúsculo, sem acento, letras repetidas reduzidas)")
     print("  Fala :", fmt(sp))
-    print("  Chat :", fmt(ch))
+    if has_chat:
+        print("  Chat :", fmt(ch))
 
 
 def main():
@@ -192,10 +197,9 @@ def main():
     tpath = os.path.join(a.workdir, "transcript.json")
     tr = json.load(open(tpath, encoding="utf-8")) if os.path.exists(tpath) else {"words": [], "segments": []}
     has_tr = bool(tr["words"])
-    sec_path = os.path.join(a.workdir, "section.json")
-    offset = json.load(open(sec_path))["offset"] if os.path.exists(sec_path) else 0.0
+    offset = section_offset(a.workdir)
 
-    print("Measuring audio loudness…")
+    print("Medindo o volume do áudio…")
     db = audio_db_per_sec(video)
     n = len(db)
     if n < a.window:
@@ -238,10 +242,15 @@ def main():
             score += wt["clip_calls"] * float(cfg.get("clip_calls_max_boost", 6)) * np.minimum(cnt, full) / full
             signals.append(f"clip-calls({n_clip})")
 
+    heat = heatmap_per_sec(os.path.join(a.workdir, "heatmap.json"), n, offset)
+    if heat is not None and wt.get("heatmap", 0):
+        score += wt["heatmap"] * z(window_sum(heat, W), cap)
+        signals.append("heatmap")
+
     # gameplay gate: drop windows with a (nearly) static picture (menus, loading, idle screens)
     gate_p = cfg.get("motion_gate_percentile", 0)
     if gate_p:
-        print("Measuring picture motion…")
+        print("Medindo o movimento da imagem…")
         mot = motion_per_sec(video, n)
         wm = window_sum(mot, W) / W
         thr = np.percentile(wm, gate_p)
@@ -269,16 +278,12 @@ def main():
 
     json.dump({"signals": signals, "window": W, "candidates": results},
               open(os.path.join(a.workdir, "hype.json"), "w", encoding="utf-8"), indent=1, ensure_ascii=False)
-    print(f"Signals used: {', '.join(signals)}\n")
+    print(f"Sinais usados: {', '.join(signals)}\n")
     for r in results:
-        print(f"#{r['rank']:>2}  {r['start_ts']}–{r['end_ts']}  peak {r['peak_ts']}  score {r['score']}")
+        print(f"#{r['rank']:>2}  {r['start_ts']}–{r['end_ts']}  pico {r['peak_ts']}  nota {r['score']}")
         if r["text"]:
             print(f"     {r['text'][:180]}")
-    if has_tr:
-        print(f"\n✓ {len(results)} candidates → hype.json  (now read transcript.txt and choose clips)")
-    else:
-        print(f"\n✓ {len(results)} candidates → hype.json  (no transcript yet: transcribe only these windows with\n"
-              f"  transcribe.py {a.workdir}/source.mp4 --windows {a.workdir}/hype.json --top 8 --language pt)")
+    print(f"\n✓ {len(results)} janelas → hype.json (apoio: confira contra a sua leitura dos blocos)")
 
 
 if __name__ == "__main__":
