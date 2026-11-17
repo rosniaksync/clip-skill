@@ -14,6 +14,15 @@ Use estas regras para ranquear os candidatos. Um corte precisa de pelo menos 2 d
 5. Os sinais do `find_hype.py` (áudio, chat da Twitch, "clipa", mapa de mais repetidos do YouTube, movimento)
    são apoio. Nunca decidem sozinhos. Pico alto sem graça na leitura é descartado; história boa sem pico fica.
 
+## Abertura do jogo (lançamento do GTA 6 e outros lançamentos)
+
+- A abertura do jogo (primeira tela, logo, primeira cena) é **sempre candidata em toda live**, mesmo com menu
+  ou tela de carregamento na imagem. É a exceção à regra de descartar menu/loading.
+- O corte começa na **reação** do streamer, não na espera do carregamento.
+- Se a música do jogo estiver alta, faça o corte mesmo assim e avise no kit:
+  "música do jogo alta: risco de som mudo" (campo `aviso` do corte).
+- **No máximo um short de abertura por live.**
+
 ## Tipos de momento que funcionam (do melhor para o pior)
 
 1. Reação emocional forte: grito, risada que não para, raiva, choque. Pico de áudio com a voz do streamer.
@@ -49,8 +58,9 @@ Use estas regras para ranquear os candidatos. Um corte precisa de pelo menos 2 d
 ## Descartar
 
 - Momentos que dependem de contexto de antes na live.
-- Silêncio longo, menu, AFK, tela de carregamento, intervalo, "já volto".
-- Música com direitos autorais tocando alto, inclusive o rádio do jogo (gera claim ou som mudo).
+- Silêncio longo, menu, AFK, tela de carregamento, intervalo, "já volto" (exceto a abertura do jogo, ver acima).
+- Música com direitos autorais tocando alto, inclusive o rádio do jogo (gera claim ou som mudo). Exceção: a
+  abertura do jogo, que é cortada mesmo assim, com o aviso no kit.
 - Qualquer dado pessoal na tela (endereço, telefone, mensagens privadas).
 
 ## Título e hashtags (kit de postagem)

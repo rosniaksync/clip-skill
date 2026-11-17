@@ -751,6 +751,8 @@ def write_posting_kit(wd, out_dir, clips, cfg):
         if c.get("hashtags"):
             tags = c["hashtags"] if isinstance(c["hashtags"], str) else " ".join(c["hashtags"])
             L.append(f"- Hashtags: {tags}")
+        if c.get("aviso"):
+            L.append(f"- ⚠ Aviso: {c['aviso']}")
         if c.get("reason"):
             L.append(f"- Por quê: {c['reason']}")
         L.append("")

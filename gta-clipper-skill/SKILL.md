@@ -184,6 +184,7 @@ Descarte o que não faz sentido sem contexto. Cada corte começa no gancho e ter
   }
 ]
 ```
+- `aviso` (opcional): alerta que sai no kit de postagem, ex.: "música do jogo alta: risco de som mudo".
 - `title`, `description` e `hashtags` são **obrigatórios** em todo corte (vão para o kit e para o Notion).
 - `style`: `"cam"` (com webcam) ou `"nocam"`. `hook` = linha 1 do card, `subhook` = linha 2 (máx. ~5 palavras,
   sem emoji, em português). `title`, `description`, `hashtags` vão para o kit de postagem.
@@ -311,6 +312,11 @@ O Notion não é mexido. Por isso:
 - **Gameplay solo não tem chat nem webcam:** a leitura da transcrição (se o usuário narra) e os frames viram a
   fonte principal de candidatos (passos 2 a 3b). Use `nocam`.
 - **Música do rádio do jogo** dá claim/mute: pular trechos com música licenciada alta (ver `viral-rules.md`).
+- **Abertura do jogo: sempre candidata em toda live** (primeira tela, logo, primeira cena), mesmo com menu ou
+  loading na imagem e mesmo sem pico nos sinais (o `find_hype.py` ignora tela parada: procure a abertura na
+  leitura e nos frames). O corte começa na reação, não na espera do carregamento. Música do jogo alta: corte
+  mesmo assim e ponha `"aviso": "música do jogo alta: risco de som mudo"` no corte (sai no kit).
+  **No máximo um short de abertura por live** (vale também entre dias: confira com `progress.py check`).
 - **Capacidade:** o limite é escolher e conferir, não renderizar. Não force número: a quantidade
   de cortes depende só de quantos momentos bons o bloco tem.
 - **Teste cego de calibração (a pedido do usuário):** ele anota os cortes que faria numa live inteira sem me
