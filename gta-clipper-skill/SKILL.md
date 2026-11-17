@@ -48,6 +48,14 @@ como short 1080x1920 (card de gancho, legenda palavra por palavra, ±10 s) e reg
   baixe o próximo. Bloco sem momento bom entrega menos cortes. Avise em uma linha a cada bloco pronto.
   Cada bloco termina com `progress.py done` (passo 6b), para nada ser repetido depois.
 - **No máximo 2 jobs pesados ao mesmo tempo** (`max_parallel_jobs`: transcrição/render). Download pode rodar junto.
+- **Renderizar sempre vem primeiro.** Assim que um bloco tiver o `clips.json`, renderize na hora, mesmo que passe
+  do limite de 2 jobs por alguns minutos. Só depois siga com transcrição/small dos blocos seguintes. O usuário
+  quer ver shorts prontos cedo, não só no fim do vídeo.
+- **Layout do short: streamer em cima, o que ele transmite embaixo. Nunca o streamer nas duas metades.** Em
+  cena de bate-papo (just chatting), em que a transmissão é só a webcam, não há conteúdo para a metade de baixo:
+  **descarte o candidato** (não force `cam` nem `nocam`). Lobby, menu, tela de carregamento e seleção de
+  personagem do jogo valem, pois são o que o streamer está transmitindo. Confira nos frames (passo 3b) que a
+  parte de baixo mostra conteúdo diferente da webcam.
 - **Chat só da Twitch** (`download.chat_twitch`, via TwitchDownloaderCLI). YouTube não baixa chat; no lugar
   dele, o mapa de "mais repetidos" (`heatmap.json`) entra como sinal de apoio (`hype.weights.heatmap`).
 - **Idioma:** detectado sozinho (`language_detect`), nunca fixo. Vídeo em outro idioma = **gringo**: legenda
