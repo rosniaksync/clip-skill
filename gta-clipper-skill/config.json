@@ -25,6 +25,13 @@
   "chunk_overlap_minutes": 5,
   "max_parallel_jobs": 2,
   "auto_next_block": true,
+  "cleanup": {
+    "idle_hours": 3,
+    "keep": [
+      "historico"
+    ],
+    "_note": "Ao ligar o note (scripts/install_cleanup.py): apaga tudo em paths.work_root que não foi mexido nas últimas idle_hours horas (vídeos baixados, temporários e shorts prontos). Fica só o que está em keep (o histórico de onde parou). O Notion não é mexido."
+  },
   "download": {
     "max_height": 1080,
     "concurrent_fragments": 8,

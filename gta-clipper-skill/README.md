@@ -20,6 +20,9 @@ Cole o link de uma live ou VOD (YouTube, Twitch, Kick...) e o Claude:
 **Histórico:** cada vídeo/live tem um arquivo em `work/historico/` com o que já foi cortado. Mandar o mesmo link
 de novo (por exemplo, a live que ainda estava rolando) continua de onde parou, sem repetir shorts.
 
+**Limpeza do dia:** ao ligar o note, a skill apaga sozinha os vídeos baixados, os temporários e os shorts do dia
+anterior. Fica só o histórico de onde parou (instale uma vez com `python scripts/install_cleanup.py`).
+
 Para trocar o gancho: "corte N: GANCHO / SUBGANCHO" (renderiza só aquele e atualiza a mesma linha do Notion).
 
 ## Estilos
@@ -39,6 +42,7 @@ detecção de idioma, extras de 10 s e Notion ficam em `config.json`. Nada fixo 
 4. Ajuste os caminhos em `config.json` → `paths` (cookies, gerador do PO token, pasta de trabalho).
 5. `python scripts/check_setup.py` deve dizer "Tudo OK". Se faltar algo, ele mostra o comando exato.
 6. Notion: `claude mcp add --transport http --scope user notion https://mcp.notion.com/mcp` e depois `/mcp`.
+7. Limpeza automática ao ligar o note: `python scripts/install_cleanup.py`.
 
 Cookies e problemas de download do YouTube: veja o `COMO-USAR.md` (caminho em `paths.setup_guide`).
 
@@ -64,6 +68,7 @@ gta-clipper-skill/
     ├── read_blocks.py     lê a transcrição em blocos de 10 min
     ├── find_hype.py       sinais de apoio (áudio, chat, "clipa", heatmap, movimento)
     ├── extract_frames.py  folhas de frames dos candidatos
+    ├── cleanup.py         limpeza do dia (fica só o histórico); install_cleanup.py liga ao entrar no Windows
     ├── progress.py        histórico por vídeo: de onde continuar, cortes repetidos
     ├── make_shorts.py     render (±10 s, legenda traduzida), preview, kit, renders.json
     ├── check_setup.py     confere a instalação

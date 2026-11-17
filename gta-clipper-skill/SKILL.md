@@ -290,6 +290,18 @@ foram registrados"); não trave.
 **Análise (só quando o usuário pedir):** leia a base de resultados, mas só aponte padrões se houver **20 ou mais
 linhas com views preenchidas** (`notion.min_rows_for_patterns`). Com menos, diga quantas faltam.
 
+## Limpeza do dia (automática, ao ligar o note)
+
+Instalada uma vez com `python scripts/install_cleanup.py` (atalho escondido na pasta Inicializar do Windows,
+sem admin; `--remove` desinstala). Toda vez que o usuário entra no Windows, `scripts/cleanup.py` apaga em
+`paths.work_root` tudo o que não foi mexido nas últimas `cleanup.idle_hours` (3) horas: vídeos baixados,
+transcrições, frames, temporários **e os shorts prontos**. Fica só `historico/` (de onde cada vídeo/live parou).
+O Notion não é mexido. Por isso:
+- No fim de cada bloco, avise: "os shorts ficam na pasta até você desligar; amanhã, ao ligar, são apagados".
+- No dia seguinte, o mesmo link continua de onde parou (pelo histórico), sem repetir.
+- Trocar gancho de um short do dia anterior não dá mais (os arquivos foram apagados): é preciso cortar de novo.
+- Teste sem apagar: `python scripts/cleanup.py --dry-run`. Registro das limpezas: `historico/limpeza.log`.
+
 ## Gameplay solo (lançamento do GTA 6, 19/11/2026) e calibração
 
 - **Gameplay solo não tem chat nem webcam:** a leitura da transcrição (se o usuário narra) e os frames viram a
