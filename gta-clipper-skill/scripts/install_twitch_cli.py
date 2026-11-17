@@ -32,7 +32,7 @@ def main():
     data = urllib.request.urlopen(asset["browser_download_url"]).read()
     os.makedirs(DEST, exist_ok=True)
     zipfile.ZipFile(io.BytesIO(data)).extractall(DEST)
-    print("OK →", DEST)
+    print("OK ->", DEST)
 
 
 if __name__ == "__main__":
