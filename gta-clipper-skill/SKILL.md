@@ -45,6 +45,7 @@ como short 1080x1920 (card de gancho, legenda palavra por palavra, ±10 s) e reg
 - **Bloco por bloco, sem esperar o usuário** (`auto_next_block`): termine o bloco 1 (passos 1 a 7), mostre a
   lista do bloco e siga sozinho para o próximo, até o fim do vídeo. Enquanto um bloco transcreve ou renderiza,
   baixe o próximo. Bloco sem momento bom entrega menos cortes. Avise em uma linha a cada bloco pronto.
+  Cada bloco termina com `progress.py done` (passo 6b), para nada ser repetido depois.
 - **No máximo 2 jobs pesados ao mesmo tempo** (`max_parallel_jobs`: transcrição/render). Download pode rodar junto.
 - **Chat só da Twitch** (`download.chat_twitch`, via TwitchDownloaderCLI). YouTube não baixa chat; no lugar
   dele, o mapa de "mais repetidos" (`heatmap.json`) entra como sinal de apoio (`hype.weights.heatmap`).
@@ -72,15 +73,23 @@ Não comece a baixar. Primeiro olhe o vídeo sem baixar:
 python scripts/download.py "<URL>" --probe
 ```
 Mostra título, canal, duração, se está ao vivo e quantos pontos de heatmap tem (e, para link de canal da
-Twitch, qual VOD vai ser usado).
+Twitch, qual VOD vai ser usado). Mostra também o **histórico** desse vídeo (ver abaixo).
+
+**Histórico (nunca repetir):** cada vídeo/live tem um arquivo em `<paths.work_root>/historico/<plataforma>_<id>.json`
+com os trechos já cortados e os shorts já feitos (horário no original). O VOD de uma live no ar tem sempre o
+mesmo id, então mandar o link de novo continua de onde parou. Detalhes: `python scripts/progress.py show work/<id>`.
+- Vídeo novo: começa em 00:00:00.
+- Já tem histórico: comece no "Continuar de" (fim do que já foi coberto menos a sobreposição) e não refaça o
+  que já foi cortado. Se o vídeo inteiro já foi coberto e não está mais ao vivo, diga isso e pare.
 
 **Live ainda no ar:**
 - **Twitch, link de canal** (`twitch.tv/nome`): se o canal estiver ao vivo, o script acha o VOD da live atual
   (`twitch.tv/nome/videos`, o mais recente marcado como ao vivo) e usa o link dele. Sem VOD: avise e pare.
   Canal offline: peça o link de um VOD. **Nunca fique gravando até a live acabar.**
-- **YouTube ao vivo:** baixa só o que já passou até agora (bloco fechado) e corta isso. Avise em uma linha que
-  a live ainda está rolando e que dá para rodar de novo depois para o resto. `live_from_start` só é ligado para
-  live no ar.
+- **YouTube ao vivo:** baixa só o que já passou até agora (bloco fechado) e corta isso. `live_from_start` só é
+  ligado para live no ar.
+- Nos dois casos, ao terminar o que já passou, diga em uma linha: "A live continua. Me mande o link de novo
+  depois que eu continuo de HH:MM:SS, sem repetir" (o histórico guarda onde parou).
 
 **Não faça perguntas.** Não pergunte quantos shorts, qual trecho nem o tamanho do bloco: é sempre o vídeo
 inteiro (live no ar: tudo o que já passou), em blocos de 30 ou 60 min que você escolhe (ver "Sempre o vídeo
@@ -153,6 +162,8 @@ Usa `transcribe_refine` (small, beam 5) e troca só esses trechos no `transcript
 ## Passo 4 — Escolher os cortes e escrever `clips.json`
 
 Releia os candidatos com o small e os frames na cabeça. Escolha pela história/graça, não pelo volume.
+Antes de renderizar, rode `python scripts/progress.py check work/<id>`: ele aponta cortes que repetem um short
+já feito (de outro bloco ou de uma vez anterior). Descarte os repetidos.
 Descarte o que não faz sentido sem contexto. Cada corte começa no gancho e termina logo após o desfecho.
 
 ```json
@@ -220,11 +231,20 @@ das palavras dentro do tempo da frase.
    arquivo (ex.: "0:10 a 0:47"), horário no original e a ordem sugerida para postar.
 3. No Windows, abra imagens com `Start-Process <png>`; `.mp4` peça para abrir pelo Explorer.
 
+## Passo 6b — Gravar no histórico (fim de CADA bloco, sempre)
+
+```
+python scripts/progress.py done work/<id>
+```
+Grava o trecho do bloco (tempo do original, com o offset real) e os shorts renderizados no histórico do vídeo.
+Rode mesmo quando o bloco não teve nenhum short: assim o trecho conta como já visto.
+
 ## Passo 7 — Trocar gancho (quando o usuário pedir)
 
 O usuário manda `corte N: GANCHO / SUBGANCHO`. Edite `hook`/`subhook` do corte N no `clips.json`, rode
 `make_shorts.py work/<id> --only N` (só ele é renderizado de novo) e atualize a **mesma** linha do Notion
-(passo 8, pelo `notion_page_id`). O modo bloco por bloco continua sozinho.
+(passo 8, pelo `notion_page_id`) e rode `progress.py done work/<id>` de novo (atualiza, não duplica).
+O modo bloco por bloco continua sozinho.
 
 ## Passo 8 — Registrar no Notion (automático)
 

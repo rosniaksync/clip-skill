@@ -35,7 +35,8 @@ import tempfile
 import time
 from urllib.parse import parse_qs, urlparse
 
-from common import cfg_path, load_config, secs, ts, twitch_cli_path, write_json
+from common import (cfg_path, history_path, history_summary, load_config, read_json, secs, ts, twitch_cli_path,
+                    write_json)
 
 LOGIN_HINTS = ("sign in", "age-restricted", "confirm your age", "log in",
                "login", "private video", "members-only", "not a bot")
@@ -270,8 +271,16 @@ def main():
             print(json.dumps({"url": url, "title": info.get("title"), "uploader": info.get("uploader"),
                               "duration": info.get("duration"), "duration_string": info.get("duration_string"),
                               "is_live": is_live, "live_status": info.get("live_status"),
-                              "heatmap_points": len(heat), "extractor": info.get("extractor_key")},
+                              "heatmap_points": len(heat), "extractor": info.get("extractor_key"), "id": info.get("id")},
                              ensure_ascii=False, indent=1))
+            hist = read_json(history_path(info.get("extractor_key"), info.get("id"), cfg))
+            if hist and hist.get("blocks"):
+                spans, covered, n = history_summary(hist)
+                ov = float(cfg.get("chunk_overlap_minutes", 5)) * 60
+                print(f"Histórico: já cortado {', '.join(f'{ts(s)}–{ts(e)}' for s, e in spans)} ({n} shorts). "
+                      f"Continuar de {ts(max(0.0, covered - ov))}.")
+            else:
+                print("Histórico: vídeo novo, nada cortado ainda.")
             return
 
         os.makedirs(a.out, exist_ok=True)

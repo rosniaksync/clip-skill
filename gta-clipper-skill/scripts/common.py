@@ -93,3 +93,33 @@ def media_duration(path):
         return float(out)
     except ValueError:
         return 0.0
+
+
+# ---------------------------------------------------------------- histórico por vídeo (não repetir cortes)
+
+def video_key(extractor, vid):
+    import re as _re
+    return _re.sub(r"[^A-Za-z0-9_.-]", "_", f"{extractor or 'video'}_{vid}")
+
+
+def history_path(extractor, vid, cfg=None):
+    """<work_root>/historico/<plataforma>_<id>.json — um arquivo por vídeo/live, entre uma vez e outra."""
+    root = cfg_path("work_root", cfg) or os.path.join(SKILL_DIR, "work")
+    return os.path.join(root, "historico", video_key(extractor, vid) + ".json")
+
+
+def merge_spans(spans):
+    out = []
+    for s, e in sorted(spans):
+        if out and s <= out[-1][1] + 1:
+            out[-1][1] = max(out[-1][1], e)
+        else:
+            out.append([s, e])
+    return out
+
+
+def history_summary(hist):
+    """(trechos já cortados juntados, até onde está coberto desde o começo, nº de shorts)."""
+    spans = merge_spans([[b["start"], b["end"]] for b in hist.get("blocks", [])])
+    covered = spans[0][1] if spans and spans[0][0] <= 1 else 0.0
+    return spans, covered, len(hist.get("clips", []))

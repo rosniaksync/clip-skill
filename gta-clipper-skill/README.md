@@ -17,6 +17,9 @@ Cole o link de uma live ou VOD (YouTube, Twitch, Kick...) e o Claude:
 7. **Entrega** o preview, o kit de postagem (título, descrição, hashtags, corte sugerido no arquivo) e
    **registra cada short no Notion** (base "Resultados dos Cortes").
 
+**Histórico:** cada vídeo/live tem um arquivo em `work/historico/` com o que já foi cortado. Mandar o mesmo link
+de novo (por exemplo, a live que ainda estava rolando) continua de onde parou, sem repetir shorts.
+
 Para trocar o gancho: "corte N: GANCHO / SUBGANCHO" (renderiza só aquele e atualiza a mesma linha do Notion).
 
 ## Estilos
@@ -61,6 +64,7 @@ gta-clipper-skill/
     ├── read_blocks.py     lê a transcrição em blocos de 10 min
     ├── find_hype.py       sinais de apoio (áudio, chat, "clipa", heatmap, movimento)
     ├── extract_frames.py  folhas de frames dos candidatos
+    ├── progress.py        histórico por vídeo: de onde continuar, cortes repetidos
     ├── make_shorts.py     render (±10 s, legenda traduzida), preview, kit, renders.json
     ├── check_setup.py     confere a instalação
     ├── install_twitch_cli.py
