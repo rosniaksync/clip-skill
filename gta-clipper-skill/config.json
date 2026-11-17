@@ -149,5 +149,6 @@
     "model": "small",
     "beam": 5,
     "language": "pt"
-  }
+  },
+  "auto_next_block": true
 }

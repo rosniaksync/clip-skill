@@ -23,6 +23,11 @@ Não use `python -I` (ele esconde o Pillow instalado no perfil do usuário).
 - **Blocos de 1 hora** (`chunk_minutes`) com 5 min de sobreposição (`chunk_overlap_minutes`) via
   `download.py --section`; descartar cortes repetidos na sobreposição. Em lives longas, 1 a 3 cortes
   por bloco, sem forçar número. O usuário costuma pedir "N shorts por hora".
+- **Bloco por bloco, sem esperar o usuário** (`auto_next_block`): termine o bloco 1 (baixar, achar momentos,
+  transcrever os melhores trechos, escolher, renderizar), **entregue os cortes dele com o preview** e então
+  siga sozinho para o bloco 2, e assim até o fim do vídeo. Enquanto um bloco transcreve ou renderiza, baixe
+  o próximo (download só usa rede). Bloco sem momento bom entrega menos cortes (não force). Avise em uma
+  linha a cada bloco pronto, com o caminho da pasta.
 - **No máximo 2 jobs pesados ao mesmo tempo** (`max_parallel_jobs`: transcrição/render). Download
   pode rodar em paralelo à vontade.
 - **Chat sempre** (`download_chat`): YouTube via yt-dlp; Twitch via `tools/TwitchDownloaderCLI` (instale uma vez com `python scripts/install_twitch_cli.py`).
