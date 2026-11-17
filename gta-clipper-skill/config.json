@@ -17,6 +17,11 @@
   "pad_before": 10,
   "pad_after": 10,
   "chunk_minutes": 60,
+  "chunk_minutes_options": [
+    30,
+    60
+  ],
+  "_chunk_note": "O Claude escolhe o tamanho do bloco por vídeo entre chunk_minutes_options (regras no SKILL.md); chunk_minutes é o padrão quando não há motivo para mudar.",
   "chunk_overlap_minutes": 5,
   "max_parallel_jobs": 2,
   "auto_next_block": true,

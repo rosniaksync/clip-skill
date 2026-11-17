@@ -26,12 +26,21 @@ como short 1080x1920 (card de gancho, legenda palavra por palavra, ±10 s) e reg
   `clips.json` é o **corte sugerido**; o kit e o Notion mostram onde ele fica dentro do arquivo (ex.: 0:10 a 0:47).
 - **Recuo antes do pico:** `pre_roll_seconds` (15 s): a reação vem depois do fato. Depois apare para a primeira
   frase/ação forte (gancho primeiro).
-- **Sempre o vídeo inteiro, em blocos de 1 hora** (`chunk_minutes`). Nunca pergunte qual trecho. O bloco N vai de
-  (N−1) h menos 5 min (`chunk_overlap_minutes`) até N h, via `download.py --section` (o bloco 1 começa em 0:00
-  e o último termina no fim do vídeo). Ex.: 00:00:00-01:00:00, 00:55:00-02:00:00, 01:55:00-03:00:00…
-  Vídeo de até 1 h = um bloco só, baixado inteiro (sem `--section`). Descarte cortes repetidos na sobreposição.
+- **Sempre o vídeo inteiro, em blocos.** Nunca pergunte qual trecho. **Você decide o tamanho do bloco** (B) por
+  vídeo, entre `chunk_minutes_options` (30 ou 60 min; padrão `chunk_minutes` = 60), antes de baixar:
+  - **30 min** quando: a live ainda está no ar (entrega mais rápido e acompanha a live); o vídeo tem até ~2 h
+    (os primeiros shorts saem antes); o conteúdo é muito agitado do começo ao fim (chat explodindo, ação o
+    tempo todo), em que um bloco de 1 h vira leitura longa demais.
+  - **60 min** quando: VOD longo (mais de ~2 h) de ritmo normal; conteúdo calmo (conversa, podcast, histórias
+    que precisam de contexto), em que um bloco curto corta a história no meio; muitos blocos de 30 min só
+    multiplicariam downloads e transcrições.
+  - Na dúvida, 60 min. Vídeo menor ou igual a B = um bloco só, baixado inteiro (sem `--section`).
+  O bloco N vai de (N−1)·B menos 5 min (`chunk_overlap_minutes`) até N·B, via `download.py --section` (o bloco 1
+  começa em 0:00 e o último termina no fim do vídeo). Ex. com B = 60: 00:00:00-01:00:00, 00:55:00-02:00:00…;
+  com B = 30: 00:00:00-00:30:00, 00:25:00-01:00:00… Descarte cortes repetidos na sobreposição.
+  O tamanho escolhido vale para o vídeo inteiro (não troque no meio).
 - **Quantos shorts:** não há número fixo nem pedido. Entregue todo corte que é bom de verdade pelas regras de
-  `references/viral-rules.md`: se um bloco de 1 h tem 20 momentos bons, entregue 20; se tem 2, entregue 2; se
+  `references/viral-rules.md`: se um bloco tem 20 momentos bons, entregue 20; se tem 2, entregue 2; se
   não tem nenhum, diga isso. Nunca complete número com corte fraco.
 - **Bloco por bloco, sem esperar o usuário** (`auto_next_block`): termine o bloco 1 (passos 1 a 7), mostre a
   lista do bloco e siga sozinho para o próximo, até o fim do vídeo. Enquanto um bloco transcreve ou renderiza,
@@ -73,11 +82,13 @@ Twitch, qual VOD vai ser usado).
   a live ainda está rolando e que dá para rodar de novo depois para o resto. `live_from_start` só é ligado para
   live no ar.
 
-**Não faça perguntas.** Não pergunte quantos shorts nem qual trecho: é sempre o vídeo inteiro, em blocos de
-1 hora (live no ar: tudo o que já passou), e a quantidade de shorts sai da qualidade (ver "Quantos shorts").
+**Não faça perguntas.** Não pergunte quantos shorts, qual trecho nem o tamanho do bloco: é sempre o vídeo
+inteiro (live no ar: tudo o que já passou), em blocos de 30 ou 60 min que você escolhe (ver "Sempre o vídeo
+inteiro, em blocos"), e a quantidade de shorts sai da qualidade (ver "Quantos shorts").
 Também não pergunte sobre permissão de repostagem (o usuário já disse que tem), nome do canal, card, webcam,
-idioma, modelo, cores. Diga em uma linha o resumo do vídeo (título, canal, duração), quantos blocos vai fazer e
-quanto deve demorar, e comece.
+idioma, modelo, cores. Antes de tudo, diga em uma ou duas linhas: o resumo do vídeo (título, canal, duração), o tamanho de bloco que
+escolheu e por quê (ex.: "blocos de 30 min: a live ainda está no ar"), quantos blocos vai fazer e quanto deve
+demorar. Depois comece.
 
 ## Passo 0 — Conferir instalação (primeira vez ou PC novo)
 
@@ -90,7 +101,7 @@ comando exato para instalar o que faltar. Cookies e problemas do YouTube: `paths
 ```
 python scripts/download.py "<URL>" --out work/<id>-b<N> --section <início>-<fim do bloco N>
 ```
-Um `work/<id>-b<N>/` por bloco de 1 hora (vídeo de até 1 h: `work/<id>/`, sem `--section`).
+Um `work/<id>-b<N>/` por bloco (vídeo de um bloco só: `work/<id>/`, sem `--section`).
 Gera `source.mp4` (até 1080p), `info.json`, e quando houver: `section.json`, `heatmap.json` (YouTube),
 `chat.json` (Twitch).
 - Com `--section` o corte é por cópia de stream e o arquivo começa no keyframe anterior. O script **mede o início
