@@ -8,12 +8,22 @@ Styles (each one is a JSON template in ../templates/<style>.json):
 Every colour, font, size, position and the channel name live in the templates.
 Each clip in clips.json carries "style", "hook" and "subhook".
 
+Each short is rendered from start - pad_before to end + pad_after (config.json, clamped to the video),
+so the editor can fine-tune; the suggested cut inside the file is printed, saved in shorts/renders.json
+and written to shorts/posting-kit.md.
+
+Foreign-language video (lang.json != pt): captions come from the clip's "captions_pt"
+([{"s","e","text"}] in file time, written by Claude). Export the original phrases to translate with
+--export-captions N (writes work/<id>/captions_<N>.json).
+
 Usage:
   make_shorts.py work/<id> --snapshot                   # frames to detect webcam / burned-in subs
   make_shorts.py work/<id> --cam 0.72,0.68,0.27,0.30    # save webcam box (x,y,w,h fractions) and render
   make_shorts.py work/<id> --burned-subs                # source already has subtitles -> no captions
   make_shorts.py work/<id> [--only 1,4] [--style cam|nocam] [--template-dir DIR]
+  make_shorts.py work/<id> --export-captions 2          # original caption phrases of clip 2 (to translate)
   make_shorts.py work/<id> --preview                    # contact sheet of rendered shorts
+  make_shorts.py work/<id> --kit                        # rewrite posting-kit.md only
 
 Per-video choices are saved in work/<id>/setup.json (cam box, burned_subs).
 """
@@ -30,19 +40,14 @@ import tempfile
 
 from PIL import Image, ImageDraw, ImageFont
 
-SKILL_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+from common import SKILL_DIR, load_config, mmss, read_json, section_offset, write_json
+from common import ts as hms
 STYLES = ("cam", "nocam")
 FPS = 30
 
 # ---------------------------------------------------------------- helpers
 
-def secs(t):
-    if isinstance(t, (int, float)):
-        return float(t)
-    v = 0.0
-    for p in str(t).split(":"):
-        v = v * 60 + float(p)
-    return v
+from common import secs  # noqa: E402
 
 
 def ass_time(t):
@@ -88,7 +93,7 @@ def duration(path):
 def load_template(tdir, style):
     path = os.path.join(tdir, f"{style}.json")
     if not os.path.exists(path):
-        sys.exit(f"Template not found: {path}")
+        sys.exit(f"Template não encontrado: {path}")
     with open(path, encoding="utf-8") as f:
         return json.load(f)
 
@@ -102,7 +107,7 @@ def resolve_font(spec, tdir=None):
         path = os.path.join(SKILL_DIR, path)
     path = os.path.normpath(path)
     if not os.path.isfile(path):
-        sys.exit(f"Font file not found: {path}")
+        sys.exit(f"Fonte não encontrada: {path}")
     return path
 
 
@@ -390,7 +395,44 @@ def group_words(words, max_words, max_chars, max_gap):
     return groups
 
 
-def build_ass(path, words, clip_len, cap, family, canvas, pos_xy, an):
+def split_phrase(text, s, e, max_words, max_chars):
+    """Translated phrase -> caption groups of words with times. The group keeps the original phrase time;
+    long phrases are split in chunks (template max_words/max_chars) and every word gets a share of the time
+    proportional to its length (word-by-word highlight)."""
+    toks = text.split()
+    if not toks or e <= s:
+        return []
+    chunks, cur = [], []
+    for t in toks:
+        n_chars = sum(len(x) + 1 for x in cur) + len(t)
+        if cur and (len(cur) >= max_words or n_chars > max_chars):
+            chunks.append(cur); cur = []
+        cur.append(t)
+    if cur:
+        chunks.append(cur)
+    total = sum(len(t) + 1 for t in toks)
+    groups, t0 = [], s
+    for ch in chunks:
+        g = []
+        for t in ch:
+            d = (e - s) * (len(t) + 1) / total
+            g.append({"w": t, "s": round(t0, 3), "e": round(t0 + d, 3)})
+            t0 += d
+        groups.append(g)
+    return groups
+
+
+def caption_groups(words, cap, translated=None):
+    """Original words (grouped by the template rules) or translated phrases (captions_pt)."""
+    if translated is not None:
+        out = []
+        for ph in translated:
+            out += split_phrase(ph.get("text", ""), ph["s"], ph["e"], cap["max_words"], cap["max_chars"])
+        return out
+    return group_words(words, cap["max_words"], cap["max_chars"], cap["max_gap"])
+
+
+def build_ass(path, groups, clip_len, cap, family, canvas, pos_xy, an):
     lines = [
         "[Script Info]", "ScriptType: v4.00+", f"PlayResX: {canvas['w']}", f"PlayResY: {canvas['h']}",
         "WrapStyle: 2", "ScaledBorderAndShadow: yes", "",
@@ -409,7 +451,7 @@ def build_ass(path, words, clip_len, cap, family, canvas, pos_xy, an):
     hi, base, sc = ass_color(cap["highlight_color"]), ass_color(cap["color"]), cap.get("highlight_scale", 112)
     up = cap.get("uppercase", True)
     events = []
-    for g in group_words(words, cap["max_words"], cap["max_chars"], cap["max_gap"]):
+    for g in groups:
         g_end = g[-1]["e"]
         for i, w in enumerate(g):
             s = w["s"]
@@ -489,18 +531,28 @@ def filter_nocam(tpl, title_xy, ass_name, fontsdir, with_title):
 
 # ---------------------------------------------------------------- render
 
-def render(workdir, clip, words, args, setup, src_w, src_h, tdir, out_dir):
+def clip_window(clip, cfg, src_dur):
+    """(render_start, render_end, cut_start, cut_end) in source-file seconds: the short is the cut
+    plus pad_before / pad_after, clamped to the video."""
+    s, e = secs(clip["start"]), secs(clip["end"])
+    rs = max(0.0, s - float(cfg.get("pad_before", 10)))
+    re_ = e + float(cfg.get("pad_after", 10))
+    if src_dur:
+        re_ = min(re_, src_dur)
+    return rs, re_, s, e
+
+
+def render(workdir, clip, words, args, setup, src_w, src_h, tdir, out_dir, cfg, src_dur, lang):
     style = args.style or clip.get("style")
     if style not in STYLES:
-        print(f"  skip #{clip['id']}: style must be one of {STYLES} (got {style!r})")
+        print(f"  pulando #{clip['id']}: style tem que ser um de {STYLES} (veio {style!r})")
         return None
     tpl = load_template(tdir, style)
     W, H = tpl["canvas"]["w"], tpl["canvas"]["h"]
 
-    s, e = secs(clip["start"]), secs(clip["end"])
-    if e <= s:
-        print(f"  skip #{clip['id']}: end before start"); return None
-    s = max(0, s - 0.05)
+    s, e, cut_s, cut_e = clip_window(clip, cfg, src_dur)
+    if cut_e <= cut_s or e <= s:
+        print(f"  pulando #{clip['id']}: fim antes do início"); return None
     length = e - s
     name = f"short_{int(clip['id']):02d}"
     tmp = tempfile.mkdtemp(prefix=name + "_", dir=out_dir)
@@ -525,9 +577,21 @@ def render(workdir, clip, words, args, setup, src_w, src_h, tdir, out_dir):
 
         # --- word-by-word captions, only if the picture has no burned-in subtitles
         want_caps = not args.no_captions and not setup.get("burned_subs") and clip.get("captions", True)
-        cw = [{"w": w["w"], "s": round(w["s"] - s, 3), "e": round(w["e"] - s, 3)}
-              for w in words if w["s"] >= s - 0.01 and w["e"] <= e + 0.3] if want_caps else []
-        has_caps = bool(cw)
+        groups = []
+        if want_caps:
+            cap = tpl["captions"]
+            if clip.get("captions_pt") is not None:      # translated (foreign video), times in file seconds
+                tr = [{"s": max(0.0, secs(p["s"]) - s), "e": min(length, secs(p["e"]) - s), "text": p.get("text", "")}
+                      for p in clip["captions_pt"] if secs(p["e"]) > s and secs(p["s"]) < e]
+                groups = caption_groups(None, cap, tr)
+            elif lang and lang != "pt":
+                sys.exit(f"Corte #{clip['id']}: o vídeo está em '{lang}' e a legenda tem que sair em português. "
+                         f"Rode --export-captions {clip['id']}, traduza e grave em captions_pt no clips.json.")
+            else:
+                cw = [{"w": w["w"], "s": round(w["s"] - s, 3), "e": round(w["e"] - s, 3)}
+                      for w in words if w["s"] >= s - 0.01 and w["e"] <= e + 0.3]
+                groups = caption_groups(cw, cap)
+        has_caps = bool(groups)
         fontsdir = ""
         ass_path = os.path.join(tmp, "cap.ass")
         if has_caps:
@@ -539,13 +603,13 @@ def render(workdir, clip, words, args, setup, src_w, src_h, tdir, out_dir):
                 pos_xy, an = (cap["x"], overlay_xy[1] + card_margin - cap.get("gap", 5)), 2
             else:
                 pos_xy, an = (cap["x"], cap["y"]), cap.get("an", 5)
-            build_ass(ass_path, cw, length, cap, family, tpl["canvas"], pos_xy, an)
+            build_ass(ass_path, groups, length, cap, family, tpl["canvas"], pos_xy, an)
 
         # --- ffmpeg graph
         if style == "cam":
             cam = clip.get("cam") or setup.get("cam")
             if not cam:
-                sys.exit("cam style needs the webcam box: run --snapshot, estimate it and pass --cam x,y,w,h")
+                sys.exit("O estilo cam precisa da caixa da webcam: rode --snapshot, estime e passe --cam x,y,w,h")
             graph, last = filter_cam(tpl, cam, src_w, src_h, overlay_xy, "cap.ass", "fonts", bool(overlay_png))
         else:
             graph, last = filter_nocam(tpl, overlay_xy, "cap.ass", "fonts", bool(overlay_png))
@@ -570,7 +634,7 @@ def render(workdir, clip, words, args, setup, src_w, src_h, tdir, out_dir):
 
     out = os.path.join(out_dir, out_name)
     verify(out)
-    return out
+    return {"file": os.path.abspath(out), "style": style, "render": [s, e], "cut": [cut_s, cut_e]}
 
 
 def verify(path):
@@ -581,7 +645,7 @@ def verify(path):
         return dict(l.split("=", 1) for l in out.split() if "=" in l)
     v, a = probe("v:0"), probe("a:0")
     if v.get("codec_name") != "h264" or v.get("pix_fmt") != "yuv420p" or (a and a.get("codec_name") != "aac"):
-        sys.exit(f"Encoding check failed for {path}: video={v} audio={a} (need h264/yuv420p/aac)")
+        sys.exit(f"Conferência da saída falhou em {path}: vídeo={v} áudio={a} (precisa h264/yuv420p/aac)")
 
 
 # ---------------------------------------------------------------- snapshot / preview
@@ -602,14 +666,14 @@ def snapshot(workdir, source, cam):
     sheet = os.path.join(workdir, "snapshot.jpg")
     subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", os.path.join(workdir, "snapshot_%d.jpg"),
                     "-vf", "scale=640:-2,tile=3x2:padding=4:color=black", "-frames:v", "1", sheet], check=True)
-    print(f"✓ {sheet}  (+ snapshot_1..6.jpg full size{', webcam box in red' if cam else ''})")
-    print("  Look for: (1) a webcam overlay, (2) subtitles burned into the picture.")
+    print(f"✓ {sheet}  (+ snapshot_1..6.jpg em tamanho cheio{', caixa da webcam em vermelho' if cam else ''})")
+    print("  Procure: (1) webcam sobre o jogo, (2) legenda gravada na imagem.")
 
 
 def preview(workdir, out_dir):
     shorts = sorted(glob.glob(os.path.join(out_dir, "short_*.mp4")))
     if not shorts:
-        sys.exit("No shorts rendered yet.")
+        sys.exit("Nenhum short renderizado ainda.")
     tmp = tempfile.mkdtemp()
     k = 0
     for p in shorts:
@@ -625,7 +689,97 @@ def preview(workdir, out_dir):
     subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", os.path.join(tmp, "%04d.jpg"),
                     "-vf", f"tile={min(cols, k)}x{rows}:padding=6:color=black", "-frames:v", "1", out], check=True)
     shutil.rmtree(tmp)
-    print(f"✓ Preview → {out}  (3 frames per short)")
+    print(f"✓ Preview → {out}  (3 quadros por short)")
+
+
+# ---------------------------------------------------------------- captions export / renders / posting kit
+
+def video_language(wd):
+    lj = read_json(os.path.join(wd, "lang.json")) or {}
+    if lj.get("language"):
+        return lj["language"]
+    return (read_json(os.path.join(wd, "transcript.json")) or {}).get("language")
+
+
+def export_captions(wd, clip, words, cfg, src_dur, tdir):
+    """Original caption phrases (whole short, with the pads) for Claude to translate into captions_pt."""
+    tpl = load_template(tdir, clip.get("style") or "cam")
+    s, e, _, _ = clip_window(clip, cfg, src_dur)
+    cw = [w for w in words if w["s"] >= s - 0.01 and w["e"] <= e + 0.3]
+    cap = tpl["captions"]
+    phrases, cur = [], []
+    for w in cw:   # phrase = words until a pause or sentence end (bigger than one caption: better translation)
+        if cur and (w["s"] - cur[-1]["e"] > cap["max_gap"] or re.search(r"[.!?]$", cur[-1]["w"])
+                    or len(cur) >= 12):
+            phrases.append(cur); cur = []
+        cur.append(w)
+    if cur:
+        phrases.append(cur)
+    out = [{"s": round(g[0]["s"], 2), "e": round(g[-1]["e"], 2), "text": " ".join(x["w"] for x in g)} for g in phrases]
+    path = os.path.join(wd, f"captions_{int(clip['id'])}.json")
+    write_json(path, out)
+    print(f"✓ {len(out)} frases de {hms(s)} a {hms(e)} → {path}")
+    print("  Traduza cada frase para português do Brasil (mesmo s/e), revise pensando na cena e grave a lista")
+    print(f"  como \"captions_pt\" do corte #{clip['id']} no clips.json.")
+    for p in out:
+        print(f"  [{p['s']:.2f}-{p['e']:.2f}] {p['text']}")
+
+
+def update_renders(wd, out_dir, clip, res, lang):
+    """shorts/renders.json: one entry per clip id with everything the posting kit and Notion need."""
+    path = os.path.join(out_dir, "renders.json")
+    data = read_json(path, {}) or {}
+    off = section_offset(wd)
+    info = read_json(os.path.join(wd, "info.json"), {}) or {}
+    rs, re_ = res["render"]
+    cs, ce = res["cut"]
+    old = data.get(str(clip["id"]), {})
+    data[str(clip["id"])] = {
+        "id": clip["id"], "file": res["file"], "style": res["style"],
+        "hook": clip.get("hook", ""), "subhook": clip.get("subhook", ""),
+        "suggested_cut_in_file": f"{mmss(cs - rs)} a {mmss(ce - rs)}",
+        "original_time": f"{hms(cs + off)} a {hms(ce + off)}",
+        "file_range_in_source": [round(rs, 2), round(re_, 2)],
+        "language": lang or "pt", "origin_language": "PT" if (lang or "pt") == "pt" else "Gringo",
+        "moment_type": clip.get("type"), "video_url": info.get("webpage_url"),
+        "channel": info.get("channel") or info.get("uploader"), "platform": info.get("extractor_key"),
+        "notion_page_id": clip.get("notion_page_id") or old.get("notion_page_id"),
+    }
+    write_json(path, data)
+    return data[str(clip["id"])]
+
+
+def write_posting_kit(wd, out_dir, clips, cfg):
+    renders = read_json(os.path.join(out_dir, "renders.json"), {}) or {}
+    info = read_json(os.path.join(wd, "info.json"), {}) or {}
+    rows = [c for c in clips if str(c["id"]) in renders]
+    if not rows:
+        return None
+    rows.sort(key=lambda c: -float(c.get("score") or 0))
+    L = [f"# Kit de postagem — {info.get('title') or os.path.basename(os.path.abspath(wd))}", ""]
+    if info.get("webpage_url"):
+        L += [f"Vídeo original: {info['webpage_url']}", ""]
+    L += ["Ordem sugerida para postar: " + ", ".join(f"#{c['id']}" for c in rows), "",
+          f"Cada arquivo tem {cfg.get('pad_before', 10):g} s extras antes e {cfg.get('pad_after', 10):g} s depois "
+          "do corte (quando o vídeo permite), para o ajuste fino no editor.", ""]
+    for c in rows:
+        r = renders[str(c["id"])]
+        L += [f"## {os.path.basename(r['file'])} — {r['hook']} / {r['subhook']}".rstrip(" /"), "",
+              f"- Corte sugerido no arquivo: {r['suggested_cut_in_file']}",
+              f"- Horário no original: {r['original_time']}",
+              f"- Título: {c.get('title', '')}"]
+        if c.get("description"):
+            L.append(f"- Descrição: {c['description']}")
+        if c.get("hashtags"):
+            tags = c["hashtags"] if isinstance(c["hashtags"], str) else " ".join(c["hashtags"])
+            L.append(f"- Hashtags: {tags}")
+        if c.get("reason"):
+            L.append(f"- Por quê: {c['reason']}")
+        L.append("")
+    path = os.path.join(out_dir, "posting-kit.md")
+    with open(path, "w", encoding="utf-8") as f:
+        f.write("\n".join(L))
+    return path
 
 
 # ---------------------------------------------------------------- main
@@ -646,7 +800,10 @@ def main():
     ap.add_argument("--only", help="comma-separated clip ids")
     ap.add_argument("--snapshot", action="store_true")
     ap.add_argument("--preview", action="store_true")
+    ap.add_argument("--export-captions", type=int, metavar="N", help="original phrases of clip N, to translate")
+    ap.add_argument("--kit", action="store_true", help="only rewrite shorts/posting-kit.md")
     args = ap.parse_args()
+    cfg = load_config()
     wd = args.workdir
     args.source = args.source or os.path.join(wd, "source.mp4")
     out_dir = args.out_dir or os.path.join(wd, "shorts")
@@ -656,7 +813,7 @@ def main():
     if args.cam:
         setup["cam"] = [float(v) for v in args.cam.split(",")]
         if len(setup["cam"]) != 4:
-            sys.exit("--cam needs 4 numbers: x,y,w,h")
+            sys.exit("--cam precisa de 4 números: x,y,w,h")
     if args.burned_subs:
         setup["burned_subs"] = True
     if args.cam or args.burned_subs:
@@ -667,12 +824,24 @@ def main():
     if args.snapshot:
         return snapshot(wd, args.source, setup.get("cam"))
 
-    clips = json.load(open(args.clips or os.path.join(wd, "clips.json"), encoding="utf-8"))
+    all_clips = json.load(open(args.clips or os.path.join(wd, "clips.json"), encoding="utf-8"))
+    if args.kit:
+        p = write_posting_kit(wd, out_dir, all_clips, cfg)
+        return print(f"✓ {p}" if p else "Nenhum short renderizado ainda.")
+    clips = all_clips
     if args.only:
         keep = {int(i) for i in args.only.split(",")}
         clips = [c for c in clips if int(c["id"]) in keep]
     tr_path = os.path.join(wd, "transcript.json")
     words = json.load(open(tr_path, encoding="utf-8"))["words"] if os.path.exists(tr_path) else []
+
+    src_dur = duration(args.source)
+    lang = video_language(wd)
+    if args.export_captions is not None:
+        c = next((c for c in all_clips if int(c["id"]) == args.export_captions), None)
+        if not c:
+            sys.exit(f"Corte #{args.export_captions} não está no clips.json")
+        return export_captions(wd, c, words, cfg, src_dur, args.template_dir)
 
     sw, sh = ffprobe(args.source, "stream=width,height", "v:0").split()[0].split(",")[:2]
     src_w, src_h = int(sw), int(sh)
@@ -681,10 +850,14 @@ def main():
     done = []
     for n, c in enumerate(clips, 1):
         print(f"● Renderizando ({n}/{len(clips)}) — #{c['id']} [{args.style or c.get('style')}] {c.get('hook', '')}")
-        p = render(wd, c, words, args, setup, src_w, src_h, args.template_dir, out_dir)
-        if p:
-            done.append(p)
-    print(f"✓ {len(done)} shorts → {out_dir}")
+        res = render(wd, c, words, args, setup, src_w, src_h, args.template_dir, out_dir, cfg, src_dur, lang)
+        if res:
+            done.append(update_renders(wd, out_dir, c, res, lang))
+    kit = write_posting_kit(wd, out_dir, all_clips, cfg)
+    print(f"✓ {len(done)} shorts → {out_dir}" + (f"  (kit: {kit})" if kit else ""))
+    for r in done:
+        print(f"  {os.path.basename(r['file'])} | {r['hook']} / {r['subhook']} | corte sugerido no arquivo: "
+              f"{r['suggested_cut_in_file']} | no original: {r['original_time']}")
 
 
 if __name__ == "__main__":

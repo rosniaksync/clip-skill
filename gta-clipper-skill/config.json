@@ -1,4 +1,12 @@
 {
+  "paths": {
+    "_note": "Caminhos deste PC. Variáveis de ambiente sobrescrevem: YT_COOKIES_MASTER, BGUTIL_POT_SCRIPT, TWITCH_DOWNLOADER_CLI, CORTES_WORK_ROOT. '~' = pasta do usuário; caminho relativo = relativo à pasta da skill.",
+    "work_root": "C:\\cortes\\work",
+    "cookies_master": "C:\\cortes\\cookies-master.txt",
+    "pot_script": "~/bgutil-ytdlp-pot-provider/server/build/generate_once.js",
+    "twitch_cli": "tools/TwitchDownloaderCLI/TwitchDownloaderCLI",
+    "setup_guide": "C:\\cortes\\COMO-USAR.md"
+  },
   "clip_min_seconds": 20,
   "clip_target_seconds": [
     25,
@@ -6,9 +14,28 @@
   ],
   "clip_max_seconds": null,
   "pre_roll_seconds": 15,
+  "pad_before": 10,
+  "pad_after": 10,
   "chunk_minutes": 60,
   "chunk_overlap_minutes": 5,
   "max_parallel_jobs": 2,
+  "auto_next_block": true,
+  "download": {
+    "max_height": 1080,
+    "concurrent_fragments": 8,
+    "chat_twitch": true,
+    "chat_margin_seconds": 30,
+    "_note": "Chat só da Twitch (YouTube não baixa chat). chat_margin_seconds: margem extra pedida ao TwitchDownloaderCLI antes/depois do trecho."
+  },
+  "language_detect": {
+    "model": "tiny",
+    "samples": 5,
+    "min_samples": 3,
+    "sample_seconds": 30,
+    "skip_edges": 0.15,
+    "min_probability": 0.4,
+    "_note": "3 a 5 trechos de ~30 s espalhados pelo meio do vídeo (pula skip_edges do começo e do fim); vence o idioma que mais aparece. Resultado em work/<id>/lang.json."
+  },
   "transcribe_fast": {
     "model": "tiny",
     "beam": 1,
@@ -16,9 +43,14 @@
   },
   "transcribe_refine": {
     "model": "small",
-    "beam": 5
+    "beam": 5,
+    "pad_seconds": 10,
+    "_note": "pad_seconds é a margem da retranscrição dos candidatos; o script usa no mínimo max(pad_before, pad_after)."
   },
-  "download_chat": true,
+  "captions_translation": {
+    "target": "pt",
+    "_note": "Vídeo em outro idioma: a legenda sai em português (campo captions_pt de cada corte em clips.json, escrito pelo Claude)."
+  },
   "hype": {
     "weights": {
       "audio": 1.0,
@@ -26,7 +58,8 @@
       "chat_reactions": 1.0,
       "clip_calls": 2.0,
       "speech_rate": 0.2,
-      "speech_words": 0.3
+      "speech_words": 0.3,
+      "heatmap": 1.0
     },
     "z_cap": 8,
     "chat_lag_seconds": 8,
@@ -144,12 +177,10 @@
     "clip_calls_max_boost": 6,
     "motion_gate_percentile": 15
   },
-  "transcribe_windows": {
-    "top": 8,
-    "pad_seconds": 20,
-    "model": "small",
-    "beam": 5,
-    "language": "pt"
-  },
-  "auto_next_block": true
+  "notion": {
+    "enabled": true,
+    "resultados_data_source": "collection://41b43190-4def-819e-87da-000b0257adc4",
+    "canais_data_source": "collection://41a43190-4def-8125-a1bb-000b848717e9",
+    "min_rows_for_patterns": 20
+  }
 }

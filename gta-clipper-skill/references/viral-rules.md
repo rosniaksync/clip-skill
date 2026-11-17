@@ -1,52 +1,60 @@
-# What makes a stream moment go viral as a short
+# O que faz um momento de live virar um bom short
 
-Use these to rank candidates. A clip needs at least 2 of them to be worth making.
+Use estas regras para ranquear os candidatos. Um corte precisa de pelo menos 2 delas para valer a pena.
 
-## How to find candidates (process)
-1. Transcribe the whole block with the `tiny` model (fast; `small` refines only the candidates); read it ALL in 10-minute blocks
-   (`read_blocks.py`), not only around audio/chat peaks. Funny stories and jokes are often said calmly.
-2. While reading, look for: **jokes, twists/reversals, arguments/discussions, unexpected situations,
-   funny stories with a payoff**, plus big reactions.
-3. Extract frames of every candidate (`extract_frames.py`) and look at them: some of the best moments are
-   visual with no speech (crash, chase, absurd scene, jump scare).
-4. Re-transcribe only the candidates with `small`, then pick the final clips.
-5. `find_hype.py` (audio/chat/"clipa") is a **support tool**: use it to cross-check candidates and to catch
-   what reading missed. It never decides alone. A loud peak with nothing funny is dropped; a great
-   story with no peak stays.
+## Como achar os candidatos (processo)
 
-## Moment types that work (best first)
-1. **Big emotional reaction** — screaming, uncontrollable laughter, rage, shock.
-   Loud audio spike + streamer voice = gold.
-2. **Clutch / insane play** — last-second escape, impossible kill, crazy stunt,
-   perfect timing. Chat usually spams here.
-3. **Fail / karma** — plan goes wrong, instant regret, "NOOO".
-4. **Funny interaction** — roast, prank on another player, NPC/RP chaos,
-   unexpected donation/TTS message.
-5. **Story with a payoff** — setup → twist → punchline inside 45 seconds.
-6. **Hot take / relatable line** — a quotable sentence people will comment on.
+1. Transcreva o bloco inteiro com o modelo rápido (`tiny`) e leia TUDO em blocos de 10 minutos
+   (`read_blocks.py`), não só em volta dos picos. Piadas e histórias boas costumam ser contadas com calma.
+2. Durante a leitura, procure: piadas, reviravoltas, discussões, situações inesperadas, histórias engraçadas
+   com desfecho e reações fortes.
+3. Extraia os frames de cada candidato (`extract_frames.py`) e olhe as imagens: alguns dos melhores momentos
+   são visuais e sem fala (batida, fuga, cena absurda, susto).
+4. Retranscreva só os candidatos com o `small` e então escolha os cortes finais.
+5. Os sinais do `find_hype.py` (áudio, chat da Twitch, "clipa", mapa de mais repetidos do YouTube, movimento)
+   são apoio. Nunca decidem sozinhos. Pico alto sem graça na leitura é descartado; história boa sem pico fica.
 
-## Hook rules (first 2 seconds decide everything)
-- Start at the peak or 1 second before it. Never start with a greeting,
-  "okay so", silence, or loading screens.
-- If the payoff is at the end, start on the most dramatic line and let the
-  build-up play — or open with a 1–2s "flash-forward" isn't supported, so just
-  trim the setup hard.
-- The `hook` text must create curiosity, not describe: "HE DIDN'T SEE IT
-  COMING 💀" beats "Funny moment in GTA".
+## Tipos de momento que funcionam (do melhor para o pior)
 
-## Length & ending
-- From 20s up, no hard maximum (see `config.json`). Under 30s loops better; go past 59s
-  when the story needs it, and never pad.
-- End on the punchline or reaction. Cut 0.3–0.8s after the last word.
-- A clean loop (end flows back into start) boosts rewatches.
+1. Reação emocional forte: grito, risada que não para, raiva, choque. Pico de áudio com a voz do streamer.
+2. Jogada absurda: fuga no último segundo, manobra impossível, timing perfeito. O chat costuma explodir.
+3. Fail e karma: o plano dá errado, arrependimento instantâneo, "NÃÃÃO".
+4. Interação engraçada: zoeira com outro jogador, NPC fazendo besteira, doação ou mensagem inesperada.
+5. História com desfecho: começo, virada e final engraçado em até ~45 segundos.
+6. Frase marcante: algo que as pessoas vão citar ou discutir nos comentários.
 
-## Skip
-- Moments that need context from earlier in the stream.
-- Long silences, menus, AFK, loading, ad breaks, "be right back".
-- Copyrighted music playing loudly (gets muted/claimed).
-- Anything with personal info on screen (addresses, phone numbers, DMs).
+## Gancho (os 2 primeiros segundos decidem tudo)
 
-## Titles & hashtags
-- Title = hook + emoji + 1 game tag. Keep under 70 chars.
-- Hashtags: game (#gta5 #gtarp), format (#shorts #gaming), streamer name,
-  1–2 trending broad tags. 5–8 total.
+- O corte sugerido começa no pico ou 1 segundo antes. Nunca começa em cumprimento, "então, tipo...",
+  silêncio, menu ou tela de carregamento. (O arquivo final ainda leva 10 segundos extras antes e depois,
+  para o ajuste fino no editor.)
+- Se o desfecho está no fim, comece na frase mais dramática e deixe a construção rolar, cortando o
+  máximo possível da preparação.
+- O texto do gancho cria curiosidade, não descreve: "ELE NÃO ESPERAVA ISSO" é melhor que
+  "Momento engraçado no GTA". Sem emoji no card. No máximo ~5 palavras por linha.
+
+## Duração e final
+
+- A partir de 20 segundos, sem máximo fixo (ver `config.json`). Abaixo de 30 segundos tende a ser
+  reassistido mais; passe de 59 segundos só quando a história pede. Nunca encha linguiça.
+- Termine no desfecho ou na reação, 0,3 a 0,8 segundo depois da última palavra.
+- Um final que emenda com o começo (loop) aumenta as reassistidas.
+
+## Vídeo gringo
+
+- A legenda sai traduzida para português. Depois de escolher os cortes, revise a tradução de cada um
+  pensando no contexto da cena: gíria, ironia e palavrão precisam soar natural em português, não literal.
+- Gancho, título e hashtags sempre em português.
+
+## Descartar
+
+- Momentos que dependem de contexto de antes na live.
+- Silêncio longo, menu, AFK, tela de carregamento, intervalo, "já volto".
+- Música com direitos autorais tocando alto, inclusive o rádio do jogo (gera claim ou som mudo).
+- Qualquer dado pessoal na tela (endereço, telefone, mensagens privadas).
+
+## Título e hashtags (kit de postagem)
+
+- Título = gancho + 1 emoji + nome do streamer. Menos de 70 caracteres.
+- Hashtags: jogo (#gta6 #gtavi), formato (#shorts #cortes), nome do streamer e 1 ou 2 amplas
+  (#gameplay #games). De 5 a 8 no total.

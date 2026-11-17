@@ -29,4 +29,4 @@ for i, c in enumerate(json.load(open(a.candidates, encoding="utf-8")), 1):
                         "-vf", "scale=640:-2", os.path.join(out, f"cand{cid}_{n+1}.jpg")], check=True)
     subprocess.run(["ffmpeg", "-v", "error", "-y", "-framerate", "1", "-i", os.path.join(out, f"cand{cid}_%d.jpg"),
                     "-vf", f"tile=3x{(a.frames + 2) // 3}", "-frames:v", "1", os.path.join(out, f"cand{cid}.jpg")], check=True)
-    print(f"cand {cid}: frames/cand{cid}.jpg")
+    print(f"candidato {cid}: frames/cand{cid}.jpg")
