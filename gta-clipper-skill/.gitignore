@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+tools/TwitchDownloaderCLI/*.exe
+tools/TwitchDownloaderCLI/*.pdb
+tools/TwitchDownloaderCLI/*.dll
+work/
+*.mp4
+cookies*.txt
