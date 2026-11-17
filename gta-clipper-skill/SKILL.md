@@ -26,8 +26,11 @@ como short 1080x1920 (card de gancho, legenda palavra por palavra, ±10 s) e reg
   `clips.json` é o **corte sugerido**; o kit e o Notion mostram onde ele fica dentro do arquivo (ex.: 0:10 a 0:47).
 - **Recuo antes do pico:** `pre_roll_seconds` (15 s): a reação vem depois do fato. Depois apare para a primeira
   frase/ação forte (gancho primeiro).
-- **Blocos de 1 hora** (`chunk_minutes`) com 5 min de sobreposição (`chunk_overlap_minutes`) via
-  `download.py --section`; descarte cortes repetidos na sobreposição. 1 a 3 cortes por bloco, sem forçar.
+- **Sempre o vídeo inteiro, em blocos de 1 hora** (`chunk_minutes`). Nunca pergunte qual trecho. O bloco N vai de
+  (N−1) h menos 5 min (`chunk_overlap_minutes`) até N h, via `download.py --section` (o bloco 1 começa em 0:00
+  e o último termina no fim do vídeo). Ex.: 00:00:00-01:00:00, 00:55:00-02:00:00, 01:55:00-03:00:00…
+  Vídeo de até 1 h = um bloco só, baixado inteiro (sem `--section`). Descarte cortes repetidos na sobreposição.
+  1 a 3 cortes por bloco, sem forçar.
 - **Bloco por bloco, sem esperar o usuário** (`auto_next_block`): termine o bloco 1 (passos 1 a 7), mostre a
   lista do bloco e siga sozinho para o próximo, até o fim do vídeo. Enquanto um bloco transcreve ou renderiza,
   baixe o próximo. Bloco sem momento bom entrega menos cortes. Avise em uma linha a cada bloco pronto.
@@ -68,14 +71,14 @@ Twitch, qual VOD vai ser usado).
   a live ainda está rolando e que dá para rodar de novo depois para o resto. `live_from_start` só é ligado para
   live no ar.
 
-Depois use a ferramenta de perguntas (AskUserQuestion), **uma rodada, no máximo 2 perguntas**, só sobre o que
-você não descobre sozinho, com um resumo do vídeo (título, canal, duração), primeira opção = recomendada:
+Depois use a ferramenta de perguntas (AskUserQuestion) **uma vez, com uma pergunta só**, com um resumo do vídeo
+(título, canal, duração e quantos blocos de 1 h), primeira opção = recomendada:
 1. **Quantos shorts?** Padrão: 2 por hora de vídeo.
-2. **Qual trecho?** Só para vídeos de 2 h ou mais (primeira hora / intervalo digitado / vídeo inteiro em blocos de 1 h).
 
-Não pergunte sobre permissão de repostagem (o usuário já disse que tem), nome do canal, card, webcam, idioma,
-modelo, cores. Depois das respostas, diga em uma linha o que vai fazer e quanto deve demorar, e comece.
-Sem resposta, use os padrões e diga quais usou.
+**Não pergunte qual trecho:** é sempre o vídeo inteiro, em blocos de 1 hora (live no ar: tudo o que já passou).
+Também não pergunte sobre permissão de repostagem (o usuário já disse que tem), nome do canal, card, webcam,
+idioma, modelo, cores. Depois da resposta, diga em uma linha o que vai fazer (quantos blocos) e quanto deve
+demorar, e comece. Sem resposta, use o padrão e diga qual usou.
 
 ## Passo 0 — Conferir instalação (primeira vez ou PC novo)
 
@@ -86,8 +89,9 @@ comando exato para instalar o que faltar. Cookies e problemas do YouTube: `paths
 ## Passo 1 — Baixar
 
 ```
-python scripts/download.py "<URL>" --out work/<id> [--section 00:00:00-01:00:00]
+python scripts/download.py "<URL>" --out work/<id>-b<N> --section <início>-<fim do bloco N>
 ```
+Um `work/<id>-b<N>/` por bloco de 1 hora (vídeo de até 1 h: `work/<id>/`, sem `--section`).
 Gera `source.mp4` (até 1080p), `info.json`, e quando houver: `section.json`, `heatmap.json` (YouTube),
 `chat.json` (Twitch).
 - Com `--section` o corte é por cópia de stream e o arquivo começa no keyframe anterior. O script **mede o início

@@ -2,7 +2,7 @@
 
 Cole o link de uma live ou VOD (YouTube, Twitch, Kick...) e o Claude:
 
-1. **Baixa** o trecho (blocos de 1 hora, até 1080p). Na Twitch baixa também o chat; no YouTube guarda o mapa de
+1. **Baixa o vídeo inteiro, sempre em blocos de 1 hora** (até 1080p), sem perguntar trecho. Na Twitch baixa também o chat; no YouTube guarda o mapa de
    "mais repetidos" (heatmap). Mede o início real do trecho (o corte por cópia começa no keyframe anterior).
    Live ainda no ar: na Twitch usa o VOD da live atual; no YouTube baixa só o que já passou.
 2. **Detecta o idioma** sozinho (3 a 5 trechos de 30 s do meio do vídeo, modelo tiny) e **transcreve o vídeo
