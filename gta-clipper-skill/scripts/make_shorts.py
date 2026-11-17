@@ -127,8 +127,19 @@ def fit_font(text, spec, size, min_size, max_width, tdir, stroke=0):
 
 # ---------------------------------------------------------------- title images (Pillow)
 
+ONE_LINE_MAX_CHARS = 18      # frase até isso cabe numa linha só; maior que isso quebra em 2 linhas
+
+
 def lines_of(clip):
-    return [clip.get("hook", ""), clip.get("subhook", "")]
+    """O card mostra UMA frase só (o `hook`), quebrada em até 2 linhas balanceadas, mesmo estilo nas duas.
+    `subhook` (clips.json antigos) é emendado ao hook como continuação da mesma frase."""
+    phrase = " ".join(x.strip() for x in (clip.get("hook", ""), clip.get("subhook", "")) if x and x.strip())
+    words = phrase.split()
+    if len(phrase) <= ONE_LINE_MAX_CHARS or len(words) < 2:
+        return [phrase, ""]
+    best = min(range(1, len(words)),
+               key=lambda i: abs(len(" ".join(words[:i])) - len(" ".join(words[i:]))))
+    return [" ".join(words[:best]), " ".join(words[best:])]
 
 
 def _stops(colors):
@@ -196,7 +207,7 @@ def render_card(tpl, clip, tdir, W):
     logo_w = (logo_size + logo_gap) if logo_spec else 0
     inner_max = c["max_width"] - 2 * (bw + box["padding_x"]) - logo_w
     texts = [clean_text(t, up) for t in lines_of(clip)]
-    specs = [c["line1"], c["line2"]]
+    specs = [c["line1"], c["line1"]]          # uma frase só: as duas linhas têm o mesmo estilo
     items = []
     for t, sp in zip(texts, specs):
         if t:
@@ -302,7 +313,7 @@ def render_stack(tpl, clip, tdir, W):
     lg_spec, t = st["logo"], st["text"]
     up = t.get("uppercase", True)
     texts = [clean_text(x, up) for x in lines_of(clip)]
-    specs = [t["line1"], t["line2"]]
+    specs = [t["line1"], t["line1"]]          # uma frase só: as duas linhas têm o mesmo estilo
     outline = t["outline"]
     items = [(x, fit_font(x, sp["font"], sp["size"], sp["min_size"], t["max_width"], tdir, outline))
              for x, sp in zip(texts, specs) if x]

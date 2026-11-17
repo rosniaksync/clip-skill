@@ -23,23 +23,25 @@
       },
       "size": 30,
       "uppercase": true,
-      "color": "#FFFFFF",
-      "bg": "#C02BE8",
+      "color": "#FF4FD8",
+      "bg": "#0A0014",
       "padding_x": 24,
       "padding_y": 8,
       "overlap": 12,
       "align": "center",
       "offset_x": 0,
       "position": "bottom",
-      "border_color": "#FFFFFF",
+      "border_color": "#FF3DCB",
       "border_width": 3,
       "bg_gradient": [
-        "#C02BE8",
-        "#FF4F9A"
+        "#14003A",
+        "#050008"
       ],
       "border_gradient": [
-        "#FFFFFF",
-        "#FFFFFF"
+        "#5B3CFF",
+        "#C02BE8",
+        "#FF3DCB",
+        "#FF6F91"
       ]
     },
     "box": {

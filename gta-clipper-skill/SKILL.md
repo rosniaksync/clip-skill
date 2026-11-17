@@ -26,22 +26,23 @@ como short 1080x1920 (card de gancho, legenda palavra por palavra, ±10 s) e reg
   `clips.json` é o **corte sugerido**; o kit e o Notion mostram onde ele fica dentro do arquivo (ex.: 0:10 a 0:47).
 - **Recuo antes do pico:** `pre_roll_seconds` (15 s): a reação vem depois do fato. Depois apare para a primeira
   frase/ação forte (gancho primeiro).
-- **Sempre o vídeo inteiro, em blocos.** Nunca pergunte qual trecho. **Você decide o tamanho do bloco** (B) por
-  vídeo, entre `chunk_minutes_options` (30 ou 60 min; padrão `chunk_minutes` = 60), antes de baixar:
-  - **30 min** quando: a live ainda está no ar (entrega mais rápido e acompanha a live); o vídeo tem até ~2 h
-    (os primeiros shorts saem antes); o conteúdo é muito agitado do começo ao fim (chat explodindo, ação o
-    tempo todo), em que um bloco de 1 h vira leitura longa demais.
-  - **60 min** quando: VOD longo (mais de ~2 h) de ritmo normal; conteúdo calmo (conversa, podcast, histórias
-    que precisam de contexto), em que um bloco curto corta a história no meio; muitos blocos de 30 min só
-    multiplicariam downloads e transcrições.
-  - Na dúvida, 60 min. Vídeo menor ou igual a B = um bloco só, baixado inteiro (sem `--section`).
-  O bloco N vai de (N−1)·B menos 5 min (`chunk_overlap_minutes`) até N·B, via `download.py --section` (o bloco 1
-  começa em 0:00 e o último termina no fim do vídeo). Ex. com B = 60: 00:00:00-01:00:00, 00:55:00-02:00:00…;
-  com B = 30: 00:00:00-00:30:00, 00:25:00-01:00:00… Descarte cortes repetidos na sobreposição.
-  O tamanho escolhido vale para o vídeo inteiro (não troque no meio).
-- **Quantos shorts:** não há número fixo nem pedido. Entregue todo corte que é bom de verdade pelas regras de
-  `references/viral-rules.md`: se um bloco tem 20 momentos bons, entregue 20; se tem 2, entregue 2; se
-  não tem nenhum, diga isso. Nunca complete número com corte fraco.
+- **Sempre o vídeo inteiro. Curto = um bloco só; longo = blocos de 30 min (nunca 60).** Nunca pergunte qual
+  trecho nem o tamanho do bloco.
+  - **Até 1 hora** (`single_block_max_minutes` = 60; vale para vídeo de 40 min, de 50 min e para live que ainda
+    não passou de 1 h): **um bloco só**, baixado inteiro (sem `--section`), sem dividir.
+  - **Mais de 1 hora** (vídeo ou live): divide em blocos de 30 min (B = 30, `chunk_minutes`), como abaixo.
+  - Live no ar: conta o que já passou. Se tem 45 min, é um bloco só; quando o usuário mandar o link de novo
+    e já passar de 1 h, o histórico continua de onde parou e daí em diante vai em blocos de 30 min.
+  O bloco N (só quando passar de 1 h) vai de (N−1)·30 menos 5 min (`chunk_overlap_minutes`) até N·30, via `download.py --section` (o bloco 1
+  começa em 0:00 e o último termina no fim do vídeo): 00:00:00-00:30:00, 00:25:00-01:00:00,
+  00:55:00-01:30:00… Descarte cortes repetidos na sobreposição.
+- **Quantos shorts: o usuário diz, a cada link.** Antes de começar qualquer vídeo/live, pergunte com
+  `AskUserQuestion`: "Quantos reels você quer por bloco de 30 min?" (opções: até 3, até 5, só o melhor, ou outro
+  número). A resposta vale para aquele link inteiro (todos os blocos) e vira o teto N do bloco. N é um **teto**,
+  não uma meta: entregue só cortes **realmente bons** pelas regras de `references/viral-rules.md`; bloco fraco
+  entrega menos que N, ou nenhum. Nunca complete número com corte fraco. Passou de N bons: fique com os N de
+  maior `score` e renderize só esses. Achou os melhores, renderiza e encerra o bloco.
+  Não guarde a resposta como padrão: no link seguinte, pergunte de novo (`ask_reels_each_link` no config).
 - **Bloco por bloco, sem esperar o usuário** (`auto_next_block`): termine o bloco 1 (passos 1 a 7), mostre a
   lista do bloco e siga sozinho para o próximo, até o fim do vídeo. Enquanto um bloco transcreve ou renderiza,
   baixe o próximo. Bloco sem momento bom entrega menos cortes. Avise em uma linha a cada bloco pronto.
@@ -50,17 +51,22 @@ como short 1080x1920 (card de gancho, legenda palavra por palavra, ±10 s) e reg
 - **Chat só da Twitch** (`download.chat_twitch`, via TwitchDownloaderCLI). YouTube não baixa chat; no lugar
   dele, o mapa de "mais repetidos" (`heatmap.json`) entra como sinal de apoio (`hype.weights.heatmap`).
 - **Idioma:** detectado sozinho (`language_detect`), nunca fixo. Vídeo em outro idioma = **gringo**: legenda
-  traduzida para português (passo 4c). Gancho, subgancho, título e hashtags sempre em português.
+  traduzida para português (passo 4c). Gancho, título e hashtags sempre em português.
 
 ## Identidade visual (não mexer sem o usuário pedir)
 
 - **Logo oficial "RSK CORTES"** (`assets/logo.png`). No card entra redonda (`circle: true`) com margem preta
   (`pad` 0.18, tamanho 190), para a arte aparecer inteira.
-- **Fontes** (em `fonts/`): Montserrat Black (gancho, subgancho, etiqueta, título do `nocam`) e Poppins ExtraBold
+- **Fontes** (em `fonts/`): Montserrat Black (gancho, etiqueta, título do `nocam`) e Poppins ExtraBold
   (legenda). Aprovadas pelo usuário.
 - **`templates/cam.json` = "RSK CORTES, cores da logo"**: caixa escura em degradê, borda neon azul (#4B5BFF) →
-  roxo (#C02BE8) → rosa (#FF3DCB) → laranja (#FF9A3C) com brilho, logo à esquerda, gancho rosa neon (#FF4FD8),
-  subgancho azul-gelo (#CFE3FF), etiqueta do canal embaixo.
+  roxo (#C02BE8) → rosa (#FF3DCB) → laranja (#FF9A3C) com brilho, logo à esquerda, texto rosa neon (#FF4FD8),
+  etiqueta do canal embaixo.
+- **Card = UMA frase só.** O texto do card é uma frase única (o `hook`), quebrada automaticamente em até 2 linhas
+  balanceadas, com **o mesmo tamanho e a mesma cor nas duas linhas**. Nunca duas frases diferentes, uma por linha
+  (o `subhook` antigo, se existir, é emendado ao `hook` como continuação da mesma frase).
+- **Etiqueta "RSK CORTES" na mesma cor do card:** fundo escuro em degradê (#14003A → #050008), borda neon em degradê
+  (azul → roxo → rosa → laranja) e texto rosa neon (#FF4FD8), igual à caixa do card (`templates/cam.json`, `card.tag`).
 - **Nome do canal** (`channel_name`): **RSK CORTES**.
 - **Legenda do `cam`:** tamanho 69, palavra em destaque rosa (#FE5CCD), `gap` 30 px acima do card
   (`captions.anchor: "above_card"`). Nunca duas legendas ao mesmo tempo.
@@ -91,13 +97,13 @@ mesmo id, então mandar o link de novo continua de onde parou. Detalhes: `python
 - Nos dois casos, ao terminar o que já passou, diga em uma linha: "A live continua. Me mande o link de novo
   depois que eu continuo de HH:MM:SS, sem repetir" (o histórico guarda onde parou).
 
-**Não faça perguntas.** Não pergunte quantos shorts, qual trecho nem o tamanho do bloco: é sempre o vídeo
-inteiro (live no ar: tudo o que já passou), em blocos de 30 ou 60 min que você escolhe (ver "Sempre o vídeo
-inteiro, em blocos"), e a quantidade de shorts sai da qualidade (ver "Quantos shorts").
+**Uma única pergunta por link: quantos reels por bloco** (ver "Quantos shorts"). Faça essa pergunta logo depois do
+`--probe` e antes de baixar, e espere a resposta. Fora essa, **não faça perguntas.** Não pergunte qual trecho nem o
+tamanho do bloco: é sempre o vídeo inteiro (live no ar: tudo o que já passou), num bloco só até 1 h e em blocos
+de 30 min acima disso (ver "Sempre o vídeo inteiro").
 Também não pergunte sobre permissão de repostagem (o usuário já disse que tem), nome do canal, card, webcam,
-idioma, modelo, cores. Antes de tudo, diga em uma ou duas linhas: o resumo do vídeo (título, canal, duração), o tamanho de bloco que
-escolheu e por quê (ex.: "blocos de 30 min: a live ainda está no ar"), quantos blocos vai fazer e quanto deve
-demorar. Depois comece.
+idioma, modelo, cores. Antes de tudo, diga em uma ou duas linhas: o resumo do vídeo (título, canal, duração),
+se é um bloco só (até 1 h) ou quantos blocos de 30 min (acima de 1 h) e quanto deve demorar. Depois comece.
 
 ## Passo 0 — Conferir instalação (primeira vez ou PC novo)
 
@@ -173,8 +179,7 @@ Descarte o que não faz sentido sem contexto. Cada corte começa no gancho e ter
     "style": "cam",
     "start": "00:08:05.0",
     "end": "00:08:33.5",
-    "hook": "EU TAVA NO FLOW STATE",
-    "subhook": "PEGUEI TODAS AS BOLAS",
+    "hook": "EU TAVA NO FLOW STATE E PEGUEI TODAS AS BOLAS",
     "title": "Ele entrou no flow state e pegou todas as bolas 😂 #alanzoka",
     "description": "Uma frase curta para a descrição.",
     "hashtags": ["#gta6", "#shorts", "#cortes", "#alanzoka", "#gameplay"],
@@ -186,8 +191,8 @@ Descarte o que não faz sentido sem contexto. Cada corte começa no gancho e ter
 ```
 - `aviso` (opcional): alerta que sai no kit de postagem, ex.: "música do jogo alta: risco de som mudo".
 - `title`, `description` e `hashtags` são **obrigatórios** em todo corte (vão para o kit e para o Notion).
-- `style`: `"cam"` (com webcam) ou `"nocam"`. `hook` = linha 1 do card, `subhook` = linha 2 (máx. ~5 palavras,
-  sem emoji, em português). `title`, `description`, `hashtags` vão para o kit de postagem.
+- `style`: `"cam"` (com webcam) ou `"nocam"`. `hook` = a frase do card, UMA frase só (até ~8 palavras, sem emoji,
+  em português); o script quebra em 2 linhas sozinho. Não use `subhook`. `title`, `description`, `hashtags` vão para o kit de postagem.
 - `type` (para o Notion): Reação, Fail, Jogada, Piada, História ou Discussão.
 - `start`/`end` em fronteiras de palavra = corte sugerido (o arquivo ganha ±10 s sozinho).
 - Opcionais: `"captions": false`, `"cam": [x,y,w,h]`, `"captions_pt"` (passo 4c), `"notion_page_id"` (passo 8).
@@ -233,6 +238,20 @@ das palavras dentro do tempo da frase.
    arquivo (ex.: "0:10 a 0:47"), horário no original e a ordem sugerida para postar.
 3. No Windows, abra imagens com `Start-Process <png>`; `.mp4` peça para abrir pelo Explorer.
 
+## Passo 6a — Organizar os shorts na pasta numerada (fim de CADA bloco)
+
+```
+python scripts/organize_shorts.py work/<id>-b<N>
+```
+Os shorts finais ficam em **`paths.shorts_root`** (padrão `C:\cortes\shorts`), **uma subpasta numerada por link**:
+o primeiro link que o usuário mandou é a pasta `1`, o segundo é a `2`, e assim por diante. **Todos os blocos do
+mesmo link vão para a mesma pasta** (mandar o mesmo link de novo continua nela). Cada arquivo sai como
+`NN_GANCHO DO SHORT.mp4` (NN continua de bloco em bloco) e a pasta ganha um `lista-de-postagem.md` (título,
+descrição, hashtags e horário no original). O registro de qual link é qual número fica em
+`shorts\_registro.json` (não mexer). A pasta fica **fora** de `work/`, então a limpeza do dia nunca apaga.
+Avise o usuário em qual pasta numerada os shorts ficaram. No Notion, o campo `Arquivo` usa `final_file` do
+`renders.json` (caminho dentro de `shorts\<número>\`).
+
 ## Passo 6b — Gravar no histórico (fim de CADA bloco, sempre)
 
 ```
@@ -244,7 +263,7 @@ do vídeo em "Progresso dos Vídeos" no Notion (passo 8, item 5).
 
 ## Passo 7 — Trocar gancho (quando o usuário pedir)
 
-O usuário manda `corte N: GANCHO / SUBGANCHO`. Edite `hook`/`subhook` do corte N no `clips.json`, rode
+O usuário manda `corte N: GANCHO` (uma frase só). Edite `hook` do corte N no `clips.json`, rode
 `make_shorts.py work/<id> --only N` (só ele é renderizado de novo) e atualize a **mesma** linha do Notion
 (passo 8, pelo `notion_page_id`) e rode `progress.py done work/<id>` de novo (atualiza, não duplica).
 O modo bloco por bloco continua sozinho.
@@ -326,7 +345,7 @@ O Notion não é mexido. Por isso:
 
 ## Como o usuário edita depois
 
-- **Gancho:** "corte N: GANCHO / SUBGANCHO" (passo 7). **Tempo do corte:** editar `start`/`end` em
+- **Gancho:** "corte N: GANCHO" (passo 7). **Tempo do corte:** editar `start`/`end` em
   `clips.json` e rodar `make_shorts.py work/<id> --only N`. Se mudar título, descrição ou hashtags, atualize também a linha do Notion.
 - **Visual** (cores, tamanhos, posição, logo, nome do canal): `templates/cam.json` ou `nocam.json`.
 - Antes de sobrescrever shorts já aprovados, guarde cópia (ex.: `shorts_antigo/`).

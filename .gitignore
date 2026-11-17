@@ -3,3 +3,6 @@ work/
 *.mp4
 *.m4a
 *.webm
+
+# Shorts finais (vídeos pesados, ficam só no PC)
+shorts/

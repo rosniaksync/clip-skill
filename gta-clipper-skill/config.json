@@ -2,6 +2,7 @@
   "paths": {
     "_note": "Caminhos deste PC. Variáveis de ambiente sobrescrevem: YT_COOKIES_MASTER, BGUTIL_POT_SCRIPT, TWITCH_DOWNLOADER_CLI, CORTES_WORK_ROOT. '~' = pasta do usuário; caminho relativo = relativo à pasta da skill.",
     "work_root": "C:\\cortes\\work",
+    "shorts_root": "C:\\cortes\\shorts",
     "cookies_master": "C:\\cortes\\cookies-master.txt",
     "pot_script": "~/bgutil-ytdlp-pot-provider/server/build/generate_once.js",
     "twitch_cli": "tools/TwitchDownloaderCLI/TwitchDownloaderCLI",
@@ -16,12 +17,14 @@
   "pre_roll_seconds": 15,
   "pad_before": 10,
   "pad_after": 10,
-  "chunk_minutes": 60,
+  "chunk_minutes": 30,
   "chunk_minutes_options": [
-    30,
-    60
+    30
   ],
-  "_chunk_note": "O Claude escolhe o tamanho do bloco por vídeo entre chunk_minutes_options (regras no SKILL.md); chunk_minutes é o padrão quando não há motivo para mudar.",
+  "single_block_max_minutes": 60,
+  "_chunk_note": "Até 60 min de vídeo/live = um bloco só (sem dividir). Mais de 60 min = blocos de 30 min. Nunca blocos de 60.",
+  "ask_reels_each_link": true,
+  "_ask_reels_note": "A cada link novo, perguntar ao usuário quantos reels quer por bloco de 30 min (AskUserQuestion). A resposta é um TETO, não meta: só cortes realmente bons, bloco fraco entrega menos, nunca completar com corte fraco. Resposta vale só para aquele link.",
   "chunk_overlap_minutes": 5,
   "max_parallel_jobs": 2,
   "auto_next_block": true,
