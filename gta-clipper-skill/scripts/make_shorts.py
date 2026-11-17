@@ -695,6 +695,11 @@ def export_captions(wd, clip, words, cfg, src_dur, tdir):
         print(f"  [{p['s']:.2f}-{p['e']:.2f}] {p['text']}")
 
 
+def hook_text(r):
+    """gancho em texto único (linha 1 + linha 2 do card, sem barra)"""
+    return r.get("hook_text") or " ".join(x for x in (r.get("hook", ""), r.get("subhook", "")) if x).strip()
+
+
 def update_renders(wd, out_dir, clip, res, lang):
     """shorts/renders.json: one entry per clip id with everything the posting kit and Notion need."""
     path = os.path.join(out_dir, "renders.json")
@@ -737,7 +742,7 @@ def write_posting_kit(wd, out_dir, clips, cfg):
           "do corte (quando o vídeo permite), para o ajuste fino no editor.", ""]
     for c in rows:
         r = renders[str(c["id"])]
-        L += [f"## {os.path.basename(r['file'])} — {r['hook_text']}", "",
+        L += [f"## {os.path.basename(r['file'])} — {hook_text(r)}", "",
               f"- Corte sugerido no arquivo: {r['suggested_cut_in_file']}",
               f"- Horário no original: {r['original_time']}",
               f"- Título: {c.get('title', '')}"]
@@ -829,7 +834,7 @@ def main():
     kit = write_posting_kit(wd, out_dir, all_clips, cfg)
     print(f"✓ {len(done)} shorts → {out_dir}" + (f"  (kit: {kit})" if kit else ""))
     for r in done:
-        print(f"  {os.path.basename(r['file'])} | {r['hook_text']} | corte sugerido no arquivo: "
+        print(f"  {os.path.basename(r['file'])} | {hook_text(r)} | corte sugerido no arquivo: "
               f"{r['suggested_cut_in_file']} | no original: {r['original_time']}")
 
 
