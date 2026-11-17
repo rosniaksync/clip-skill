@@ -1,6 +1,6 @@
 ---
 name: gta-clipper-skill
-description: Transforma qualquer live ou vídeo longo (YouTube, Twitch VOD, Kick etc.) em shorts verticais prontos para postar (1080x1920, card de gancho, legenda palavra por palavra, 10 s extras antes e depois). Use quando o usuário colar um link de live/vídeo e pedir shorts, cortes, reels, clips, ou "is stream se viral shorts banao".
+description: Transforma qualquer live ou vídeo longo (YouTube, Twitch VOD, Kick etc.) em shorts verticais prontos para postar (1080x1920, card de gancho, legenda palavra por palavra, 10 s extras antes e depois). Use quando o usuário colar um link de live/vídeo e pedir shorts, cortes, reels ou clips.
 ---
 
 # Live → Shorts virais
@@ -40,12 +40,12 @@ como short 1080x1920 (card de gancho, legenda palavra por palavra, ±10 s) e reg
 ## Identidade visual (não mexer sem o usuário pedir)
 
 - **Logo oficial "RSK CORTES"** (`assets/logo.png`). No card entra redonda (`circle: true`) com margem preta
-  (`pad` 0.18, tamanho 190), para a arte aparecer inteira. Logo antiga "Cortes GTA 6": `assets/logo_gta6_loucuras.png`.
+  (`pad` 0.18, tamanho 190), para a arte aparecer inteira.
 - **Fontes** (em `fonts/`): Montserrat Black (gancho, subgancho, etiqueta, título do `nocam`) e Poppins ExtraBold
   (legenda). Aprovadas pelo usuário.
 - **`templates/cam.json` = "RSK CORTES, cores da logo"**: caixa escura em degradê, borda neon azul (#4B5BFF) →
   roxo (#C02BE8) → rosa (#FF3DCB) → laranja (#FF9A3C) com brilho, logo à esquerda, gancho rosa neon (#FF4FD8),
-  subgancho azul-gelo (#CFE3FF), etiqueta do canal embaixo. Backups: `cam_gta6_loucuras.json`, `cam_laranja.json`.
+  subgancho azul-gelo (#CFE3FF), etiqueta do canal embaixo.
 - **Nome do canal** (`channel_name`): **RSK CORTES**.
 - **Legenda do `cam`:** tamanho 69, palavra em destaque rosa (#FE5CCD), `gap` 30 px acima do card
   (`captions.anchor: "above_card"`). Nunca duas legendas ao mesmo tempo.
@@ -251,14 +251,12 @@ linhas com views preenchidas** (`notion.min_rows_for_patterns`). Com menos, diga
 - **Gameplay solo não tem chat nem webcam:** a leitura da transcrição (se o usuário narra) e os frames viram a
   fonte principal de candidatos (passos 2 a 3b). Use `nocam`.
 - **Música do rádio do jogo** dá claim/mute: pular trechos com música licenciada alta (ver `viral-rules.md`).
-- **Capacidade (estimativa, medir no Aspire 16 quando chegar):** ~10-15 shorts por hora de trabalho no Aspire e
-  ~6-10 no PC antigo (i5-2400); o limite é escolher e conferir, não renderizar. Contar ~4 bons cortes por hora de
-  gameplay gravado. Não force número.
+- **Capacidade:** o limite é escolher e conferir, não renderizar. Contar ~4 bons cortes por hora de gameplay
+  gravado. Não force número.
 - **Teste cego de calibração (a pedido do usuário):** ele anota os cortes que faria numa live inteira sem me
   mostrar; eu rodo o fluxo e comparamos (coincidências, só dele, só meus, e por quê). Os padrões que ele explicar
   vão para `references/viral-rules.md` e para a memória.
 - **Postagem:** espalhar os shorts ao longo dos dias; os melhores primeiro.
-- **Ideia pendente:** ler marcadores de capítulo do OBS (ou "clipa" falado) como candidatos de maior peso.
 
 ## Como o usuário edita depois
 

@@ -137,8 +137,6 @@ def main():
     ap.add_argument("--range", action="append", help="só transcreve S-E (hh:mm:ss); pode repetir")
     ap.add_argument("--candidates", help="JSON [{start,end}] (seg ou hh:mm:ss): só esses trechos (passada small)")
     ap.add_argument("--pad", type=float, help="margem antes/depois de cada candidato (mín. max(pad_before, pad_after))")
-    ap.add_argument("--windows", help="(fluxo antigo) hype.json do find_hype.py: transcreve os --top melhores")
-    ap.add_argument("--top", type=int, default=8, help="com --windows: quantos candidatos")
     ap.add_argument("--detect-only", action="store_true", help="só detecta o idioma e grava lang.json")
     a = ap.parse_args()
 
@@ -154,7 +152,7 @@ def main():
     if a.detect_only:
         return
 
-    refine = bool(a.candidates or a.range or a.windows)
+    refine = bool(a.candidates or a.range)
     pcfg = cfg.get("transcribe_refine" if refine else "transcribe_fast", {})
     model_name = a.model or pcfg.get("model", "small" if refine else "tiny")
     beam = a.beam or pcfg.get("beam", 5 if refine else 1)
@@ -171,10 +169,6 @@ def main():
             for c in json.load(f):
                 ranges.append((max(0.0, secs(c["start"]) - pad), min(total, secs(c["end"]) + pad) if total
                                else secs(c["end"]) + pad))
-    if a.windows:
-        with open(a.windows, encoding="utf-8") as f:
-            for c in json.load(f)["candidates"][:a.top]:
-                ranges.append((max(0.0, c["start"] - pad), min(total, c["end"] + pad) if total else c["end"] + pad))
     ranges = merge_ranges(ranges) if ranges else [[0.0, None]]   # None = vídeo inteiro
 
     model = models.get(model_name)

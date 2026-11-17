@@ -49,9 +49,9 @@ gta-clipper-skill/
 ├── SKILL.md            instruções que o Claude segue (fluxo completo e decisões)
 ├── CLAUDE.md
 ├── config.json         caminhos, duração, extras, blocos, idioma, sinais e pesos, Notion
-├── assets/             logo.png (RSK CORTES) e logos antigas
+├── assets/logo.png     logo oficial (RSK CORTES)
 ├── fonts/              Montserrat Black e Poppins ExtraBold
-├── templates/          cam.json e nocam.json (ativos) + backups
+├── templates/          cam.json e nocam.json
 ├── references/viral-rules.md   regras de corte
 ├── tools/              TwitchDownloaderCLI (instalado por scripts/install_twitch_cli.py, fora do git)
 └── scripts/

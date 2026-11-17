@@ -3,7 +3,7 @@
 
 Styles (each one is a JSON template in ../templates/<style>.json):
   cam    video WITH webcam: facecam on top, gameplay below, title card on the split
-  nocam  video WITHOUT webcam: blurred background, gameplay in the middle, title on top
+  nocam  video WITHOUT webcam: blurred background, round logo + hook on top, gameplay in the middle
 
 Every colour, font, size, position and the channel name live in the templates.
 Each clip in clips.json carries "style", "hook" and "subhook".
@@ -100,7 +100,7 @@ def load_template(tdir, style):
 
 # ---------------------------------------------------------------- fonts
 
-def resolve_font(spec, tdir=None):
+def resolve_font(spec):
     """spec = {"file": "fonts/X.ttf"}: direct path, absolute or relative to the skill folder. No searching."""
     path = spec["file"]
     if not os.path.isabs(path):
@@ -116,7 +116,7 @@ def pil_font(path, size):
 
 
 def fit_font(text, spec, size, min_size, max_width, tdir, stroke=0):
-    path = resolve_font(spec, tdir)
+    path = resolve_font(spec)
     while True:
         f = pil_font(path, size)
         w = f.getlength(text) + 2 * stroke
@@ -216,7 +216,7 @@ def render_card(tpl, clip, tdir, W):
     ch = clean_text(tpl.get("channel_name", ""), tag.get("uppercase", True))
     tag_img = None
     if ch:
-        tf = pil_font(resolve_font(tag["font"], tdir), tag["size"])
+        tf = pil_font(resolve_font(tag["font"]), tag["size"])
         l, tp, r, b = tf.getbbox(ch)
         tb0 = tag.get("border_width", 0)
         tw, th = r - l + 2 * (tag["padding_x"] + tb0), b - tp + 2 * (tag["padding_y"] + tb0)
@@ -352,34 +352,6 @@ def render_stack(tpl, clip, tdir, W):
     return img, glow_m
 
 
-def render_title(tpl, clip, tdir):
-    """nocam style: white caps, thick font, black outline, 2 lines."""
-    t = tpl["title"]
-    up = t.get("uppercase", True)
-    st = t["outline"]
-    texts = [clean_text(x, up) for x in lines_of(clip)]
-    specs = [t["line1"], t["line2"]]
-    items = []
-    for x, sp in zip(texts, specs):
-        if x:
-            items.append((x, fit_font(x, sp["font"], sp["size"], sp["min_size"], t["max_width"], tdir, st), sp["color"]))
-    if not items:
-        return None
-    metrics = [f.getbbox(x, stroke_width=st) for x, f, _ in items]
-    w = max(m[2] - m[0] for m in metrics) + 4
-    h = sum(m[3] - m[1] for m in metrics) + t["line_gap"] * (len(items) - 1) + 4
-    img = Image.new("RGBA", (w, h), (0, 0, 0, 0))
-    d = ImageDraw.Draw(img)
-    y = 2
-    for (x, f, col), m in zip(items, metrics):
-        lw = m[2] - m[0]
-        px = {"left": 2, "right": w - lw - 2}.get(t.get("align", "center"), (w - lw) // 2)
-        d.text((px - m[0], y - m[1]), x, font=f, fill=hex_rgb(col),
-               stroke_width=st, stroke_fill=hex_rgb(t["outline_color"]))
-        y += m[3] - m[1] + t["line_gap"]
-    return img
-
-
 # ---------------------------------------------------------------- captions (ASS)
 
 def group_words(words, max_words, max_chars, max_gap):
@@ -493,7 +465,7 @@ def cam_box_px(cam, src_w, src_h, target_aspect):
     return bw, bh, px, py
 
 
-def filter_cam(tpl, cam, src_w, src_h, card_xy, ass_name, fontsdir, with_card):
+def filter_cam(tpl, cam, src_w, src_h, card_xy, with_card):
     W = tpl["canvas"]["w"]
     L = tpl["layout"]
     ch, gh, fx = L["cam_height"], L["game_height"], L["game_focus_x"]
@@ -513,7 +485,7 @@ def filter_cam(tpl, cam, src_w, src_h, card_xy, ass_name, fontsdir, with_card):
     return f, last
 
 
-def filter_nocam(tpl, title_xy, ass_name, fontsdir, with_title):
+def filter_nocam(tpl, title_xy, with_title):
     W, H = tpl["canvas"]["w"], tpl["canvas"]["h"]
     bg, g = tpl["layout"]["background"], tpl["layout"]["game"]
     gw = int(round(W * g["zoom"] / 2)) * 2
@@ -568,9 +540,7 @@ def render(workdir, clip, words, args, setup, src_w, src_h, tdir, out_dir, cfg, 
                 img, box_cy, card_margin = r
                 overlay_xy = ((W - img.width) // 2, tpl["card"]["anchor_y"] - box_cy)
         else:
-            img = render_title(tpl, clip, tdir)
-            if img:
-                overlay_xy = ((W - img.width) // 2, tpl["title"]["y_top"])
+            sys.exit(f"Template {style} sem 'stack' nem 'card': nada para desenhar o gancho.")
         if img:
             overlay_png = os.path.join(tmp, "overlay.png")
             img.save(overlay_png)
@@ -596,7 +566,7 @@ def render(workdir, clip, words, args, setup, src_w, src_h, tdir, out_dir, cfg, 
         ass_path = os.path.join(tmp, "cap.ass")
         if has_caps:
             cap = tpl["captions"]
-            font_path = resolve_font(cap["font"], tdir)
+            font_path = resolve_font(cap["font"])
             fontsdir = os.path.dirname(font_path)
             family = " ".join(pil_font(font_path, 20).getname()).replace(" Regular", "")
             if cap.get("anchor") == "above_card" and overlay_png:   # bottom of text = gap px above the card tag
@@ -610,9 +580,9 @@ def render(workdir, clip, words, args, setup, src_w, src_h, tdir, out_dir, cfg, 
             cam = clip.get("cam") or setup.get("cam")
             if not cam:
                 sys.exit("O estilo cam precisa da caixa da webcam: rode --snapshot, estime e passe --cam x,y,w,h")
-            graph, last = filter_cam(tpl, cam, src_w, src_h, overlay_xy, "cap.ass", "fonts", bool(overlay_png))
+            graph, last = filter_cam(tpl, cam, src_w, src_h, overlay_xy, bool(overlay_png))
         else:
-            graph, last = filter_nocam(tpl, overlay_xy, "cap.ass", "fonts", bool(overlay_png))
+            graph, last = filter_nocam(tpl, overlay_xy, bool(overlay_png))
         if has_caps:
             fd = fontsdir.replace("\\", "/").replace(":", "\\:")
             graph += f";[{last}]ass=cap.ass:fontsdir='{fd}'[cap]"

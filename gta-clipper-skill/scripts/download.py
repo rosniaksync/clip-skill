@@ -3,7 +3,7 @@
 
 Uso:
   download.py URL --out work/<id> [--section 01:00:00-02:00:00] [--max-height 1080]
-                  [--cookies ARQ] [--player-client web] [--no-chat]
+                  [--cookies ARQ] [--cookies-from-browser NAV] [--player-client web] [--no-chat]
   download.py URL --probe        # só olha (título, canal, duração, ao vivo, heatmap), não baixa
 
 Gera em --out:
@@ -214,6 +214,7 @@ def main():
     ap.add_argument("--out")
     ap.add_argument("--section", help="início-fim, ex.: 00:30:00-01:45:00 (tempo do vídeo original)")
     ap.add_argument("--cookies", help="arquivo master de cookies (sempre usado por cópia)")
+    ap.add_argument("--cookies-from-browser", help="lê os cookies direto do navegador (ex.: firefox)")
     ap.add_argument("--player-client", help="player_client do YouTube (opcional), ex.: web ou tv")
     ap.add_argument("--max-height", type=int, default=dcfg.get("max_height", 1080))
     ap.add_argument("--no-chat", action="store_true")
@@ -242,6 +243,8 @@ def main():
 
     def opts(extra=None):
         o = base_opts(cfg, cookie_copy, a.player_client)
+        if a.cookies_from_browser:
+            o["cookiesfrombrowser"] = (a.cookies_from_browser,)
         o.update(extra or {})
         return o
 
