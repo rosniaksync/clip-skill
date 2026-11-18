@@ -360,7 +360,7 @@ Para cada short renderizado:
    formato aprovado em 17/11/2026): `python scripts/progress.py notion work/<id>` imprime os campos prontos:
    - `Streamer` (título da linha): nome do canal/streamer (`channel`/`uploader` do `info.json`)
    - `Link da live`: link do vídeo/live
-   - `ID do vídeo` e `Trechos cortados` (ex.: `00:00:00–01:12:47`): ficam escondidos na visão "Lives"; são a
+   - `ID do vídeo` e `Trechos cortados` (ex.: `00:00:00–01:12:47`): aparecem na visão "Lives"; são a
      reserva da skill caso o histórico do PC (`historico/`) suma. Sempre preencha os dois.
    Só esses 4 campos (não crie outros nesta base). Status e aviso ("A live continua…", "Concluído") vão só para a
    mensagem no chat, não para o Notion. Se `notion_page_id` vier vazio, crie a linha e guarde o id com

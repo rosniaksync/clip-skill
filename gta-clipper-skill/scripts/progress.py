@@ -48,7 +48,7 @@ PLATFORM = {"youtube": "YouTube", "youtubetab": "YouTube", "twitchvod": "Twitch"
 
 def notion_fields(info, hist, cfg):
     """Linha de 'Progresso dos Vídeos' (aprovado em 17/11/2026): só Streamer e Link da live para o usuário,
-    mais ID do vídeo e Trechos cortados (escondidos), a reserva caso o histórico local suma."""
+    mais ID do vídeo e Trechos cortados, a reserva caso o histórico local suma."""
     st = status_of(info, hist, cfg)
     spans, _, _ = history_summary(hist)
     return {
