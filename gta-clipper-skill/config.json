@@ -196,5 +196,7 @@
     "min_rows_for_patterns": 20
   },
   "ask_blocks_each_link": true,
-  "_ask_blocks_note": "A cada link novo, perguntar quantos blocos separar (junto com a pergunta dos reels). O trecho a cortar é dividido em K blocos iguais (ex.: 44 min em 2 = 2 de 22 min). O download de cada bloco depois do primeiro começa chunk_overlap_minutes antes (no máximo 1/4 do bloco) para não perder momento na divisa; cortes repetidos são descartados."
+  "_ask_blocks_note": "A cada link novo, perguntar quantos blocos separar (junto com a pergunta dos reels). O trecho a cortar é dividido em K blocos iguais (ex.: 44 min em 2 = 2 de 22 min). O download de cada bloco depois do primeiro começa chunk_overlap_minutes antes (no máximo 1/4 do bloco) para não perder momento na divisa; cortes repetidos são descartados.",
+  "ask_duration_each_link": true,
+  "_ask_duration_note": "A cada link (vídeo ou live), perguntar primeiro quanto tempo cortar a partir do começo ou do 'Continuar de' (opções: tudo + 2 ou 3 tempos redondos). Depois perguntar blocos e reels sobre esse tempo. O que não for cortado fica para a próxima vez."
 }

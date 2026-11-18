@@ -29,9 +29,11 @@ registra cada short no Notion.
   o arquivo ganha `pad_folga` (10 s) antes e depois, e o kit mostra onde o corte fica (ex.: 0:10 a 0:38).
 - **Recuo antes do pico:** `pre_roll_seconds` (15 s): a reação vem depois do fato. Depois apare para a primeira
   frase/ação forte (gancho primeiro).
-- **Sempre o vídeo inteiro, dividido em quantos blocos o usuário pedir** (pergunta a cada link, ver passo −1;
-  `ask_blocks_each_link`). Nunca pergunte qual trecho: é sempre o vídeo inteiro (live no ar: tudo o que já
-  passou; link com histórico: o que falta, a partir do "Continuar de").
+- **O tempo que o usuário pedir, dividido em quantos blocos ele pedir** (perguntas a cada link, ver passo −1;
+  `ask_duration_each_link`, `ask_blocks_each_link`). O ponto de partida é sempre o começo do vídeo ou, se o link
+  tiver histórico, o "Continuar de". A partir dele o usuário diz quanto tempo cortar (ex.: "1 hora" = do ponto
+  de partida até 1 h depois; "tudo" = até o fim / até agora na live no ar). O que não for cortado agora fica para
+  a próxima vez que ele mandar o link (o histórico só marca como feito o que foi cortado).
   - O trecho a cortar (duração D) é dividido em **K blocos iguais** (K = resposta do usuário): cada bloco tem
     D/K. Ex.: 44 min em 2 blocos → 2 blocos de 22 min (00:00:00–00:22:00 e 00:22:00–00:44:00). 1 bloco = o vídeo
     inteiro, baixado sem `--section`.
@@ -116,17 +118,29 @@ mesmo id, então mandar o link de novo continua de onde parou. Detalhes: `python
 - Nos dois casos, ao terminar o que já passou, diga em uma linha: "A live continua. Me mande o link de novo
   depois que eu continuo de HH:MM:SS, sem repetir" (o histórico guarda onde parou).
 
-**Duas perguntas por link, juntas num único `AskUserQuestion`, logo depois do `--probe` e antes de baixar:**
-1. **"Quantos blocos você quer que eu separe?"** Mostre a duração do trecho a cortar na pergunta e, em cada
-   opção, o tamanho que cada bloco teria (ex.: para 44 min: "1 bloco (44 min)", "2 blocos (22 min cada)",
-   "3 blocos (~15 min cada)"; o usuário pode digitar outro número).
-2. **"Quantos reels você quer por bloco?"** (ver "Quantos shorts").
-Espere as duas respostas. As duas valem só para aquele link; no link seguinte, pergunte de novo. Fora essas,
-**não faça perguntas.** Não pergunte qual trecho (é sempre o vídeo inteiro; live no ar: tudo o que já passou).
+**Três perguntas por link (vídeo ou live), em duas rodadas, logo depois do `--probe` e antes de baixar:**
+
+Rodada 1, sozinha (o tamanho dos blocos depende dela):
+1. **"Quanto tempo você quer que eu corte?"** Diga na pergunta quanto o vídeo/live tem e de onde começo, ex.:
+   "A live tem 2:00:00. Quanto tempo você quer que eu corte, a partir do começo?" ou, com histórico, "A live
+   tem 2:00:00 e já cortei até 0:45:00. Quanto tempo você quer que eu corte a partir de 0:45:00 (falta
+   1:15:00)?". Opções: "Tudo (<o que falta>)" e 2 ou 3 tempos redondos menores que façam sentido (ex.: "1 hora",
+   "30 minutos"); o usuário pode digitar outro tempo.
+
+Rodada 2, as duas juntas num único `AskUserQuestion` (calculadas sobre o tempo escolhido):
+2. **"Quantos blocos você quer que eu separe?"** Mostre o tempo escolhido e, em cada opção, o tamanho que cada
+   bloco teria (ex.: para 44 min: "1 bloco (44 min)", "2 blocos (22 min cada)", "3 blocos (~15 min cada)"; o
+   usuário pode digitar outro número).
+3. **"Quantos reels você quer por bloco?"** (ver "Quantos shorts").
+
+Espere as respostas. Elas valem só para aquele link; no link seguinte (ou quando mandar o mesmo link de novo),
+pergunte de novo. Fora essas, **não faça perguntas.**
+Se o vídeo inteiro já foi cortado e não está mais ao vivo, não pergunte nada: diga isso e pare.
 Também não pergunte sobre permissão de repostagem (o usuário já disse que tem), nome do canal, card, webcam,
 idioma, modelo, cores. Depois das respostas, diga em uma ou duas linhas: o resumo do vídeo (título, canal,
-duração), os blocos com os horários (ex.: "2 blocos: 0:00–22:00 e 22:00–44:00") e quanto deve demorar. Depois
-comece.
+duração), o trecho escolhido, os blocos com os horários (ex.: "2 blocos: 0:00–22:00 e 22:00–44:00") e quanto
+deve demorar. Depois comece. No fim do último bloco, se sobrou vídeo sem cortar (por escolha do usuário ou porque
+a live continua), diga em uma linha de onde continuo na próxima vez.
 
 ## Passo 0 — Conferir instalação (primeira vez ou PC novo)
 

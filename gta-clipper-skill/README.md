@@ -2,7 +2,7 @@
 
 Cole o link de uma live ou VOD (YouTube, Twitch, Kick...) e o Claude:
 
-1. **Pergunta quantos blocos e quantos reels por bloco** e baixa o vídeo inteiro dividido em blocos iguais
+1. **Pergunta quanto tempo cortar, quantos blocos e quantos reels por bloco** e baixa o vídeo inteiro dividido em blocos iguais
    (até 1080p; ex.: 44 min em 2 blocos = 2 de 22 min). Na Twitch baixa também o chat; no YouTube guarda o mapa de
    "mais repetidos" (heatmap). Mede o início real do trecho (o corte por cópia começa no keyframe anterior).
    Live ainda no ar: na Twitch usa o VOD da live atual; no YouTube baixa só o que já passou.
