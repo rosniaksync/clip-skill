@@ -413,8 +413,18 @@ Quando o usuário manda um link (Twitch ou YouTube, live no ar ou VOD) com a pal
 abertura do jogo" de um ou vários links), use este modo em vez do fluxo normal. Objetivo: **o short da reação ao
 abrir o jogo + os melhores momentos dos primeiros 30 min de jogo**, rápido, sem perguntas.
 
-1. **Sem perguntas.** Não faça as perguntas de tempo, blocos e reels. Vários links: faça em fila, um de cada vez
-   (download do próximo pode rodar enquanto o atual transcreve/renderiza), e avise em uma linha a cada link pronto.
+1. **Sem perguntas.** Não faça as perguntas de tempo, blocos e reels.
+   **Vários links (fila):** o usuário pode mandar um link atrás do outro, inclusive enquanto você trabalha.
+   - Guarde a fila em `<paths.work_root>/fila.md`: uma linha por link, na ordem de chegada, com número, streamer
+     (do `--probe`), link e situação (`na fila` / `fazendo` / `pronto: N shorts` / `ainda não abriu` / `erro`).
+     Atualize a cada mudança; é a fonte da verdade da fila, não a memória da conversa.
+   - Link novo chegou: rode só o `--probe`, ponha na fila e responda **uma linha**: "Entrou na fila: #N <streamer>
+     (na frente: X)". Link repetido (mesmo ID) não entra duas vezes: diga em qual posição ele já está.
+   - Faça um link por vez, na ordem (o download do próximo pode rodar enquanto o atual transcreve/renderiza).
+     Cada link tem a própria pasta de trabalho (`work/<id>-abertura/`) e a própria pasta numerada de shorts, então
+     nada se mistura.
+   - A cada link pronto, uma mensagem curta: "#N <streamer> pronto: <k> shorts em C:\cortes\shorts\<pasta>
+     (fila: faltam Y)". Se o usuário perguntar "como está a fila?", mostre o `fila.md` em tabela.
 2. **`download.py "<URL>" --probe`.** Se o histórico já marcar a abertura dessa live como feita, diga e passe
    para o próximo link. Twitch VOD: o `--probe` mostra os **capítulos** (categoria/jogo); o capítulo do jogo
    marca quando ele abriu, então comece por ele.
@@ -432,7 +442,7 @@ abrir o jogo + os melhores momentos dos primeiros 30 min de jogo**, rápido, sem
 5. **Cortes** (passos 2 a 6 normais, com as regras de "Início e fim perfeitos" e `check_cut.py`):
    - **Short 1 = a abertura**: começa na reação ao abrir o jogo (não na espera do loading) e termina no fim da
      reação. Gancho tipo "A REAÇÃO DELE ABRINDO O GTA 6". Música alta: corte mesmo assim, com o `aviso`.
-   - **Mais até `abertura.max_extra` (3) melhores momentos** desses 30 min, pelas regras de `viral-rules.md`.
+   - **Mais até `abertura.max_extra` (5) melhores momentos** desses 30 min, pelas regras de `viral-rules.md`.
      É teto, não meta: se não tiver momento bom, entregue só a abertura.
 6. **Pasta, histórico e Notion** como sempre (passos 6a, 6b e 8): mesma pasta numerada e mesmo "Link N" se o
    link já tiver sido mandado antes. `progress.py done` grava o trecho cortado, então se o usuário depois pedir

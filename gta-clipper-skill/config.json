@@ -201,7 +201,7 @@
   "_ask_duration_note": "A cada link (vídeo ou live), perguntar primeiro quanto tempo cortar a partir do começo ou do 'Continuar de' (opções: tudo + 2 ou 3 tempos redondos). Depois perguntar blocos e reels sobre esse tempo. O que não for cortado fica para a próxima vez.",
   "abertura": {
     "minutes_after": 30,
-    "max_extra": 3,
+    "max_extra": 5,
     "search_window_minutes": 20,
     "_note": "Modo abertura (usuário manda 'abertura' + link): 1 short da reação ao abrir o jogo + até max_extra melhores momentos dos minutes_after minutos seguintes. Sem perguntas. Procura a abertura em janelas de search_window_minutes (Twitch: pelos capítulos do VOD)."
   }
