@@ -47,7 +47,22 @@ PLATFORM = {"youtube": "YouTube", "youtubetab": "YouTube", "twitchvod": "Twitch"
 
 
 def notion_fields(info, hist, cfg):
-    """Linha de 'Progresso dos Vídeos': até onde cortou, de onde continuar e se a live continua."""
+    """Linha de 'Progresso dos Vídeos' (aprovado em 17/11/2026): só Streamer e Link da live para o usuário,
+    mais ID do vídeo e Trechos cortados (escondidos), a reserva caso o histórico local suma."""
+    st = status_of(info, hist, cfg)
+    spans, _, _ = history_summary(hist)
+    return {
+        "Streamer": info.get("channel") or info.get("uploader") or info.get("title") or info["id"],
+        "Link da live": info.get("webpage_url"),
+        "ID do vídeo": history_path(info.get("extractor_key"), info["id"], cfg).rsplit(os.sep, 1)[-1][:-5],
+        "Trechos cortados": ", ".join(f"{ts(a)}–{ts(b)}" for a, b in spans),
+        "notion_page_id": hist.get("notion_page_id"),
+        "_status": st["Status"], "_aviso": st["Aviso"],   # só para a mensagem no chat, não vai para o Notion
+    }
+
+
+def status_of(info, hist, cfg):
+    """Status e aviso do vídeo (para a mensagem no chat): até onde cortou e de onde continuar."""
     spans, covered, n = history_summary(hist)
     nxt = ts(continue_from(covered, cfg))
     dur = float(hist.get("duration") or info.get("duration") or 0)
@@ -59,23 +74,7 @@ def notion_fields(info, hist, cfg):
     else:
         status = "Em andamento"
         aviso = f"Parou em {ts(covered)}. Me mande o link de novo que eu continuo de {nxt}, sem repetir."
-    bm = hist.get("block_minutes")
-    return {
-        "Vídeo": info.get("title") or info["id"],
-        "Status": status,
-        "Aviso": aviso,
-        "Continuar de": "" if status == "Concluído" else nxt,
-        "Cortado até": ts(covered),
-        "Trechos cortados": ", ".join(f"{ts(a)}–{ts(b)}" for a, b in spans),
-        "Shorts feitos": n,
-        "Blocos feitos": len(hist.get("blocks", [])),
-        "Tamanho do bloco": f"{int(bm)} min" if bm else None,
-        "Plataforma": PLATFORM.get((info.get("extractor_key") or "").lower(), "Outro"),
-        "Link do vídeo": info.get("webpage_url"),
-        "ID do vídeo": history_path(info.get("extractor_key"), info["id"], cfg).rsplit(os.sep, 1)[-1][:-5],
-        "date:Última atualização:start": datetime.date.today().isoformat(),
-        "notion_page_id": hist.get("notion_page_id"),
-    }
+    return {"Status": status, "Aviso": aviso, "Continuar de": "" if status == "Concluído" else nxt}
 
 
 def show(hist, cfg):
@@ -105,7 +104,9 @@ def main():
     if a.cmd == "show":
         return show(hist, cfg)
     if a.cmd == "notion":
-        return print(json.dumps(notion_fields(info, hist, cfg), ensure_ascii=False, indent=1))
+        f = notion_fields(info, hist, cfg)
+        print(json.dumps({k: v for k, v in f.items() if not k.startswith("_")}, ensure_ascii=False, indent=1))
+        return print(f"Situação (só para o chat): {f['_status']}: {f['_aviso']}")
     if a.cmd == "set-notion":
         if not a.page_id:
             sys.exit("set-notion precisa do id da página")
@@ -160,8 +161,8 @@ def main():
     spans, covered, n = history_summary(hist)
     print(f"✓ Histórico atualizado: bloco {ts(block['start'])}–{ts(block['end'])}, +{new} shorts "
           f"(total {n}); coberto até {ts(covered)} → {path}")
-    f = notion_fields(info, hist, cfg)
-    print(f"  {f['Status']}: {f['Aviso']}")
+    st = status_of(info, hist, cfg)
+    print(f"  {st['Status']}: {st['Aviso']}")
     print("  Atualize 'Progresso dos Vídeos' no Notion com: progress.py notion " + wd)
 
 

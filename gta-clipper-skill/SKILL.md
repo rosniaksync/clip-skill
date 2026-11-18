@@ -356,14 +356,17 @@ Para cada short renderizado:
    `Plataforma` (YouTube, Twitch, Kick ou Outro) e `Status` "Cortando". Para cada short novo: `Cortes feitos` +1
    e `Último corte` = hoje. Se a base estiver na lixeira ou der erro, pule este item sem avisar a cada short
    (uma linha no fim do bloco basta).
-3. **Progresso do vídeo** (uma linha por vídeo/live, no fim de cada bloco, depois do `progress.py done`):
-   `python scripts/progress.py notion work/<id>` imprime os campos prontos: `Vídeo`, `Status` (Em andamento /
-   Live continua / Concluído), `Aviso` (ex.: "A live continua. Me mande o link de novo depois que eu continuo de
-   00:35:00, sem repetir."), `Continuar de`, `Cortado até`, `Trechos cortados`, `Shorts feitos`, `Blocos feitos`,
-   `Tamanho do bloco`, `Plataforma`, `Link do vídeo`, `ID do vídeo`, `Última atualização`; e `Canal` = relação
-   com a página do canal (só se a base de canais estiver ativa). Se `notion_page_id` vier vazio, crie a linha e guarde o id com
+3. **Progresso do vídeo** (uma linha por vídeo/live, no fim de cada bloco, depois do `progress.py done`;
+   formato aprovado em 17/11/2026): `python scripts/progress.py notion work/<id>` imprime os campos prontos:
+   - `Streamer` (título da linha): nome do canal/streamer (`channel`/`uploader` do `info.json`)
+   - `Link da live`: link do vídeo/live
+   - `ID do vídeo` e `Trechos cortados` (ex.: `00:00:00–01:12:47`): ficam escondidos na visão "Lives"; são a
+     reserva da skill caso o histórico do PC (`historico/`) suma. Sempre preencha os dois.
+   Só esses 4 campos (não crie outros nesta base). Status e aviso ("A live continua…", "Concluído") vão só para a
+   mensagem no chat, não para o Notion. Se `notion_page_id` vier vazio, crie a linha e guarde o id com
    `progress.py set-notion work/<id> <page_id>`; se vier preenchido, **atualize essa linha** (nunca crie outra).
-   Se o histórico local sumir, procure a linha pelo `ID do vídeo` antes de criar.
+   Se o histórico local sumir, procure a linha pelo `ID do vídeo` antes de criar e use os `Trechos cortados`
+   dela para não repetir.
 
 Se o Notion não estiver disponível, renderize normal e avise em uma linha ("Notion indisponível: os shorts não
 foram registrados"); não trave.
