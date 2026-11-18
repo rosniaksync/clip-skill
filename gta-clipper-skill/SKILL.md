@@ -70,7 +70,7 @@ registra cada short no Notion.
 ## Identidade visual (não mexer sem o usuário pedir)
 
 - **Logo oficial "RSK CORTES"** (`assets/logo.png`). No card entra redonda (`circle: true`) com margem preta
-  (`pad` 0.18, tamanho 190), para a arte aparecer inteira.
+  (`pad` 0.18, tamanho 134), para a arte aparecer inteira.
 - **Fontes** (em `fonts/`): Montserrat Black (gancho, etiqueta, título do `nocam`) e Poppins ExtraBold
   (legenda). Aprovadas pelo usuário.
 - **`templates/cam.json` = "RSK CORTES, cores da logo"**: caixa escura em degradê, borda neon azul (#4B5BFF) →
@@ -79,6 +79,9 @@ registra cada short no Notion.
 - **Card = UMA frase só.** O texto do card é uma frase única (o `hook`), quebrada automaticamente em até 2 linhas
   balanceadas, com **o mesmo tamanho e a mesma cor nas duas linhas**. Nunca duas frases diferentes, uma por linha
   (o `subhook` antigo, se existir, é emendado ao `hook` como continuação da mesma frase).
+- **Tamanho do card (aprovado em 17/11/2026):** caixa de 168 px de altura (logo 134, `padding_y` 14,
+  `line_gap` 4) e fonte do gancho 48 (mínimo 33). As duas linhas usam sempre o mesmo tamanho (o menor que
+  coube); a largura da caixa acompanha o texto.
 - **Etiqueta "RSK CORTES" na mesma cor do card:** fundo escuro em degradê (#14003A → #050008), borda neon em degradê
   (azul → roxo → rosa → laranja) e texto rosa neon (#FF4FD8), igual à caixa do card (`templates/cam.json`, `card.tag`).
 - **Nome do canal** (`channel_name`): **RSK CORTES**.

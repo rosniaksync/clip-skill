@@ -50,8 +50,8 @@
       "border_width": 5,
       "radius": 26,
       "padding_x": 30,
-      "padding_y": 22,
-      "line_gap": 8,
+      "padding_y": 14,
+      "line_gap": 4,
       "bg_gradient": [
         "#14003A",
         "#050008"
@@ -76,8 +76,8 @@
       "font": {
         "file": "fonts/Montserrat-Black.ttf"
       },
-      "size": 80,
-      "min_size": 44,
+      "size": 48,
+      "min_size": 33,
       "color": "#FF4FD8"
     },
     "line2": {
@@ -92,7 +92,7 @@
       "file": "assets/logo.png",
       "circle": true,
       "pad": 0.18,
-      "size": 190,
+      "size": 134,
       "gap": 18
     },
     "text_glow": {

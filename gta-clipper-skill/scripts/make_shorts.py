@@ -215,6 +215,9 @@ def render_card(tpl, clip, tdir, W):
             items.append((t, fit_font(t, sp["font"], sp["size"], sp["min_size"], inner_max, tdir), sp["color"]))
     if not items:
         return None
+    # mesmo tamanho nas duas linhas: as duas usam o menor tamanho que coube
+    size = min(f.size for _, f, _ in items)
+    items = [(t, pil_font(resolve_font(c["line1"]["font"]), size), col) for t, _, col in items]
 
     metrics = []
     for t, f, col in items:
