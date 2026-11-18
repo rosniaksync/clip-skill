@@ -8,9 +8,10 @@ Styles (each one is a JSON template in ../templates/<style>.json):
 Every colour, font, size, position and the channel name live in the templates.
 Each clip in clips.json carries "style", "hook" and "subhook".
 
-Each short is rendered from start - pad_before to end + pad_after (config.json, clamped to the video),
-so the editor can fine-tune; the suggested cut inside the file is printed, saved in shorts/renders.json
-and written to shorts/posting-kit.md.
+Each short is rendered from start - pad_before to end + pad_after (config.json, clamped to the video).
+With pad_before = pad_after = 0 (default) the file is exactly the chosen cut, ready to post. A clip with
+"folga": true gets pad_folga seconds before and after ("esse com folga"). The cut inside the file is printed,
+saved in shorts/renders.json and written to shorts/posting-kit.md.
 
 Foreign-language video (lang.json != pt): captions come from the clip's "captions_pt"
 ([{"s","e","text"}] in file time, written by Claude). Export the original phrases to translate with
@@ -516,10 +517,15 @@ def filter_nocam(tpl, title_xy, with_title):
 
 def clip_window(clip, cfg, src_dur):
     """(render_start, render_end, cut_start, cut_end) in source-file seconds: the short is the cut
-    plus pad_before / pad_after, clamped to the video."""
+    plus pad_before / pad_after (0 = exact cut), or pad_folga on each side when the clip has "folga": true,
+    clamped to the video."""
     s, e = secs(clip["start"]), secs(clip["end"])
-    rs = max(0.0, s - float(cfg.get("pad_before", 10)))
-    re_ = e + float(cfg.get("pad_after", 10))
+    if clip.get("folga"):
+        pb = pa = float(cfg.get("pad_folga", 10))
+    else:
+        pb, pa = float(cfg.get("pad_before", 0)), float(cfg.get("pad_after", 0))
+    rs = max(0.0, s - pb)
+    re_ = e + pa
     if src_dur:
         re_ = min(re_, src_dur)
     return rs, re_, s, e
@@ -532,6 +538,18 @@ def render(workdir, clip, words, args, setup, src_w, src_h, tdir, out_dir, cfg, 
         return None
     tpl = load_template(tdir, style)
     W, H = tpl["canvas"]["w"], tpl["canvas"]["h"]
+    if style == "cam":
+        # per-video (setup.json) or per-clip overrides:
+        #   "split": "half"  -> streamer and gameplay the same size (webcam overlay also shows in the gameplay)
+        #   "game_focus_x"   -> where the gameplay crop sits (0 = left, 1 = right), to dodge a webcam overlay
+        lay, card = dict(tpl["layout"]), dict(tpl["card"])
+        if clip.get("split", setup.get("split")) == "half":
+            lay["cam_height"] = lay["game_height"] = H // 2
+            card["anchor_y"] = H // 2
+        fx = clip.get("game_focus_x", setup.get("game_focus_x"))
+        if fx is not None:
+            lay["game_focus_x"] = float(fx)
+        tpl = {**tpl, "layout": lay, "card": card}
 
     s, e, cut_s, cut_e = clip_window(clip, cfg, src_dur)
     if cut_e <= cut_s or e <= s:
@@ -749,12 +767,15 @@ def write_posting_kit(wd, out_dir, clips, cfg):
     if info.get("webpage_url"):
         L += [f"Vídeo original: {info['webpage_url']}", ""]
     L += ["Ordem sugerida para postar: " + ", ".join(f"#{c['id']}" for c in rows), "",
-          f"Cada arquivo tem {cfg.get('pad_before', 10):g} s extras antes e {cfg.get('pad_after', 10):g} s depois "
-          "do corte (quando o vídeo permite), para o ajuste fino no editor.", ""]
+          (f"Cada arquivo tem {cfg.get('pad_before', 0):g} s extras antes e {cfg.get('pad_after', 0):g} s depois "
+           "do corte (quando o vídeo permite)." if float(cfg.get('pad_before', 0)) or float(cfg.get('pad_after', 0))
+           else "Cada arquivo é o corte exato, pronto para postar sem editar (o corte sugerido é o arquivo inteiro). "
+                f"Cortes marcados \"com folga\" têm {cfg.get('pad_folga', 10):g} s extras antes e depois."), ""]
     for c in rows:
         r = renders[str(c["id"])]
         L += [f"## {os.path.basename(r['file'])} — {hook_text(r)}", "",
-              f"- Corte sugerido no arquivo: {r['suggested_cut_in_file']}",
+              f"- Corte sugerido no arquivo: {r['suggested_cut_in_file']}"
+              + (" (com folga)" if c.get("folga") else " (arquivo inteiro)" if r['suggested_cut_in_file'].startswith("0:00 a") else ""),
               f"- Horário no original: {r['original_time']}",
               f"- Título: {c.get('title', '')}"]
         if c.get("description"):

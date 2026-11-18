@@ -15,8 +15,10 @@
   ],
   "clip_max_seconds": null,
   "pre_roll_seconds": 15,
-  "pad_before": 10,
-  "pad_after": 10,
+  "pad_before": 0,
+  "pad_after": 0,
+  "pad_folga": 10,
+  "_pad_note": "pad_before/pad_after = 0: o short sai exatamente no corte escolhido (pronto para postar). Corte com \"folga\": true no clips.json (pedido \"esse com folga\") ganha pad_folga s antes e depois.",
   "chunk_minutes": 30,
   "chunk_minutes_options": [
     30
@@ -60,7 +62,7 @@
     "model": "small",
     "beam": 5,
     "pad_seconds": 10,
-    "_note": "pad_seconds é a margem da retranscrição dos candidatos; o script usa no mínimo max(pad_before, pad_after)."
+    "_note": "pad_seconds é a margem da retranscrição dos candidatos; o script usa no mínimo max(pad_before, pad_after, pad_folga), para a legenda cobrir um corte com folga e o check_cut.py ter as palavras precisas em volta do início e do fim."
   },
   "captions_translation": {
     "target": "pt",

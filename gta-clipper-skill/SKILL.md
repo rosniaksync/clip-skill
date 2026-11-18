@@ -1,13 +1,14 @@
 ---
 name: gta-clipper-skill
-description: Transforma qualquer live ou vídeo longo (YouTube, Twitch VOD, Kick etc.) em shorts verticais prontos para postar (1080x1920, card de gancho, legenda palavra por palavra, 10 s extras antes e depois). Use quando o usuário colar um link de live/vídeo e pedir shorts, cortes, reels ou clips.
+description: Transforma qualquer live ou vídeo longo (YouTube, Twitch VOD, Kick etc.) em shorts verticais prontos para postar (1080x1920, card de gancho, legenda palavra por palavra, início e fim exatos, pronto para postar sem editar). Use quando o usuário colar um link de live/vídeo e pedir shorts, cortes, reels ou clips.
 ---
 
 # Live → Shorts virais
 
 O usuário cola o link de uma live. Você baixa, detecta o idioma, transcreve (tiny no vídeo todo), lê tudo em
 blocos de 10 min, olha os frames, retranscreve os candidatos com o small, escolhe os cortes, renderiza cada um
-como short 1080x1920 (card de gancho, legenda palavra por palavra, ±10 s) e registra cada short no Notion.
+como short 1080x1920 (card de gancho, legenda palavra por palavra, começando e terminando no ponto exato) e
+registra cada short no Notion.
 
 - Trabalhe em `work/<id>/` dentro de `paths.work_root` do `config.json`; os shorts saem em `work/<id>/shorts/`.
 - Scripts em `scripts/` desta skill: `python <skill-dir>/scripts/<nome>.py`.
@@ -21,9 +22,11 @@ como short 1080x1920 (card de gancho, legenda palavra por palavra, ±10 s) e reg
   `TWITCH_DOWNLOADER_CLI`, `CORTES_WORK_ROOT`.
 - **Duração do corte:** mínimo `clip_min_seconds` (20), ideal `clip_target_seconds` (25–45), sem máximo
   (`clip_max_seconds` null). Sem enrolação no fim.
-- **Extras no arquivo:** `pad_before` / `pad_after` (10 s). O short é renderizado inteiro (card, legenda, layout)
-  de `start - pad_before` até `end + pad_after`, respeitando o começo e o fim do vídeo. O `start`/`end` do
-  `clips.json` é o **corte sugerido**; o kit e o Notion mostram onde ele fica dentro do arquivo (ex.: 0:10 a 0:47).
+- **Corte exato, pronto para postar:** `pad_before` / `pad_after` = 0. O short sai exatamente de `start` a `end`
+  do `clips.json`, que você escolhe pelas regras de "Início e fim perfeitos" (`references/viral-rules.md`) e
+  confere com `check_cut.py` (passo 4d). O "corte sugerido no arquivo" é o arquivo inteiro (ex.: 0:00 a 0:28).
+- **Com folga (só quando o usuário pedir "esse com folga"):** ponha `"folga": true` no corte e renderize só ele;
+  o arquivo ganha `pad_folga` (10 s) antes e depois, e o kit/Notion mostram onde o corte fica (ex.: 0:10 a 0:38).
 - **Recuo antes do pico:** `pre_roll_seconds` (15 s): a reação vem depois do fato. Depois apare para a primeira
   frase/ação forte (gancho primeiro).
 - **Sempre o vídeo inteiro. Curto = um bloco só; longo = blocos de 30 min (nunca 60).** Nunca pergunte qual
@@ -56,6 +59,9 @@ como short 1080x1920 (card de gancho, legenda palavra por palavra, ±10 s) e reg
   **descarte o candidato** (não force `cam` nem `nocam`). Lobby, menu, tela de carregamento e seleção de
   personagem do jogo valem, pois são o que o streamer está transmitindo. Confira nos frames (passo 3b) que a
   parte de baixo mostra conteúdo diferente da webcam.
+  **Webcam sobre o jogo que também apareceria embaixo** (ex.: canto inferior esquerdo): grave no `setup.json` do
+  bloco `"split": "half"` (streamer e jogo do mesmo tamanho, 960/960, card na divisão) e `"game_focus_x"` (0 a 1,
+  ex.: 1.0 = recorte do jogo na direita) para tirar a webcam da metade de baixo. Também vale por corte no `clips.json`.
 - **Chat só da Twitch** (`download.chat_twitch`, via TwitchDownloaderCLI). YouTube não baixa chat; no lugar
   dele, o mapa de "mais repetidos" (`heatmap.json`) entra como sinal de apoio (`hype.weights.heatmap`).
 - **Idioma:** detectado sozinho (`language_detect`), nunca fixo. Vídeo em outro idioma = **gringo**: legenda
@@ -171,7 +177,8 @@ susto) e confirma ou derruba candidatos.
 python scripts/transcribe.py work/<id>/source.mp4 --candidates work/<id>/cands.json
 ```
 Usa `transcribe_refine` (small, beam 5) e troca só esses trechos no `transcript.json`. A margem é
-`transcribe_refine.pad_seconds`, nunca menor que `pad_before`/`pad_after`, para a legenda cobrir os extras.
+`transcribe_refine.pad_seconds` (10 s), nunca menor que `pad_folga`: assim o `check_cut.py` tem as palavras
+precisas em volta do início e do fim, e um corte "com folga" tem legenda nos extras.
 
 ## Passo 4 — Escolher os cortes e escrever `clips.json`
 
@@ -179,6 +186,16 @@ Releia os candidatos com o small e os frames na cabeça. Escolha pela história/
 Antes de renderizar, rode `python scripts/progress.py check work/<id>`: ele aponta cortes que repetem um short
 já feito (de outro bloco ou de uma vez anterior). Descarte os repetidos.
 Descarte o que não faz sentido sem contexto. Cada corte começa no gancho e termina logo após o desfecho.
+
+**Início e fim perfeitos** (o short é postado sem editar; regras completas em `references/viral-rules.md`):
+- **Início:** no gancho, a primeira frase ou ação que já prende (nunca cumprimento, "então", "tipo", silêncio,
+  menu, loading). Contexto só se precisar, com a frase mínima (até ~3 s) antes do gancho. Em fronteira de
+  palavra: início = começo da primeira palavra − 0,15 s, nunca no meio de palavra ou sílaba. Momento visual
+  (batida, fuga, susto): 0,5 a 1 s antes da ação, conferido nos frames. Nunca num corte de câmera ou transição.
+- **Fim:** 0,3 a 0,8 s depois da última palavra do desfecho ou da reação. Risada ou grito: corte quando o som
+  começa a cair, nunca no pico. Nada depois do desfecho ("bom", "enfim", "chat", troca de assunto). Se houver
+  troca de cena logo depois, o fim fica antes dela. Quando der, um final que emende com o começo (loop).
+- Depois de escrever o `clips.json`, **sempre** confira cada corte com `check_cut.py` (passo 4d) antes de renderizar.
 
 ```json
 [
@@ -202,8 +219,26 @@ Descarte o que não faz sentido sem contexto. Cada corte começa no gancho e ter
 - `style`: `"cam"` (com webcam) ou `"nocam"`. `hook` = a frase do card, UMA frase só (até ~8 palavras, sem emoji,
   em português); o script quebra em 2 linhas sozinho. Não use `subhook`. `title`, `description`, `hashtags` vão para o kit de postagem.
 - `type` (para o Notion): Reação, Fail, Jogada, Piada, História ou Discussão.
-- `start`/`end` em fronteiras de palavra = corte sugerido (o arquivo ganha ±10 s sozinho).
-- Opcionais: `"captions": false`, `"cam": [x,y,w,h]`, `"captions_pt"` (passo 4c), `"notion_page_id"` (passo 8).
+- `start`/`end` = o corte exato do arquivo (com 2 casas decimais, ex.: `00:08:14.73`), conferido no passo 4d.
+- Opcionais: `"folga": true` (só se o usuário pedir), `"captions": false`, `"cam": [x,y,w,h]`, `"captions_pt"` (passo 4c), `"notion_page_id"` (passo 8).
+
+## Passo 4d — Conferir início e fim de cada corte (antes de renderizar, sempre)
+
+Depois de escrever o `clips.json`, para **cada** corte:
+```
+python scripts/check_cut.py work/<id> --clip N
+```
+Mostra, no início e no fim: as palavras com tempo de 3 s antes a 3 s depois (passada small do `transcript.json`),
+o volume do áudio a cada 0,1 s, as trocas de cena perto do corte e uma folha de frames
+(`frames/cut<N>_inicio.jpg` e `frames/cut<N>_fim.jpg`, em ordem: −1,0 −0,5 0 +0,5 +1,0 +1,5 s no início e
+−1,5 −1,0 −0,5 0 +0,5 +1,0 s no fim). Também dá alertas com o tempo certo (corte no meio de palavra, folga fora
+da regra, fim no pico do som, transição no começo ou no fim).
+1. Leia as palavras e o volume, **abra as duas folhas de frames** (Read) e ajuste `start`/`end` no `clips.json`
+   pelas regras de "Início e fim perfeitos".
+2. Rode `check_cut.py` de novo até não sobrar alerta (ou até o alerta restante ter um motivo, ex.: momento
+   visual sem fala no começo).
+3. Só então exporte a legenda (passo 4c, se gringo) e renderize (passo 5). Se o `start`/`end` mudar depois de
+   traduzir, exporte e confira o `captions_pt` de novo.
 
 ## Passo 4b — Ver o vídeo e escolher o estilo
 
@@ -217,7 +252,7 @@ Descarte o que não faz sentido sem contexto. Cada corte começa no gancho e ter
 
 Se `lang.json` não for `pt`, a legenda de cada corte sai traduzida (o render recusa o corte sem tradução):
 1. `python scripts/make_shorts.py work/<id> --export-captions N` → `captions_N.json` com as frases originais
-   do short inteiro (com os ±10 s), cada uma com seu tempo `s`/`e` (tempo do arquivo).
+   do short inteiro, cada uma com seu tempo `s`/`e` (tempo do arquivo).
 2. Traduza **frase por frase** para português do Brasil, mantendo `s`/`e` de cada frase.
 3. Revise cada frase pensando na cena: gíria, ironia e palavrão soando natural em português, não literal.
 4. Grave a lista revisada em `clips.json` como `"captions_pt": [{"s": 80.0, "e": 82.4, "text": "..."}]`.
@@ -234,8 +269,9 @@ das palavras dentro do tempo da frase.
   legenda acima do card.
 - **`nocam`** (layout `stack` em `nocam.json`): fundo desfocado, logo RSK redonda com anel rosa→laranja no topo,
   gancho em degradê GTA com contorno e brilho, gameplay no meio, legenda rosa embaixo.
-- Cada short = corte + `pad_before`/`pad_after`. O script imprime, por short: arquivo, gancho/subgancho e
-  "corte sugerido no arquivo", e grava `shorts/renders.json` e `shorts/posting-kit.md`.
+- Cada short = exatamente o corte (`start` a `end`); com `"folga": true`, o corte + `pad_folga` dos dois lados.
+  O script imprime, por short: arquivo, gancho e "corte sugerido no arquivo" (sem folga, o arquivo inteiro:
+  0:00 até a duração), e grava `shorts/renders.json` e `shorts/posting-kit.md`.
 
 ## Passo 6 — Conferir e mostrar a lista do bloco
 
@@ -243,7 +279,7 @@ das palavras dentro do tempo da frase.
    recorte da webcam e card sem cobrir rosto.
 2. No fim de cada bloco, mostre a lista: **arquivo, gancho (texto único), corte sugerido no arquivo**, e a pasta.
    O `posting-kit.md` tem, por short: título (<70 caracteres), descrição, 5–8 hashtags, corte sugerido no
-   arquivo (ex.: "0:10 a 0:47"), horário no original e a ordem sugerida para postar.
+   arquivo (sem folga é o arquivo inteiro, ex.: "0:00 a 0:28"), horário no original e a ordem sugerida para postar.
 3. No Windows, abra imagens com `Start-Process <png>`; `.mp4` peça para abrir pelo Explorer.
 
 ## Passo 6a — Organizar os shorts na pasta numerada (fim de CADA bloco)
@@ -276,6 +312,18 @@ O usuário manda `corte N: GANCHO` (uma frase só). Edite `hook` do corte N no `
 (passo 8, pelo `notion_page_id`) e rode `progress.py done work/<id>` de novo (atualiza, não duplica).
 O modo bloco por bloco continua sozinho.
 
+## Passo 7b — Ajustar início/fim ou pedir folga (quando o usuário pedir)
+
+- `corte N: começa X s antes` / `corte N: começa X s depois`: `start` do corte N − X / + X.
+- `corte N: termina X s antes` / `corte N: termina X s depois`: `end` do corte N − X / + X.
+- `esse com folga` / `corte N com folga`: `"folga": true` no corte N (o arquivo ganha `pad_folga` s antes e depois).
+
+Em todos: edite só o corte N no `clips.json`, rode `check_cut.py work/<id> --clip N` para ver se o novo ponto não
+caiu no meio de palavra ou numa transição (avise em uma linha se cair, mas faça o que o usuário pediu), exporte e
+ajuste o `captions_pt` se for gringo, rode `make_shorts.py work/<id> --only N`, `organize_shorts.py` e
+`progress.py done work/<id>`, e atualize a **mesma** linha do Notion (`Corte sugerido no arquivo`, `Horário no
+original`, `Arquivo`; pelo `notion_page_id`, nunca crie outra).
+
 ## Passo 8 — Registrar no Notion (automático)
 
 Usa o MCP do Notion do usuário (`claude mcp add --transport http --scope user notion https://mcp.notion.com/mcp`,
@@ -295,7 +343,8 @@ Para cada short renderizado:
    - `Data do corte`: hoje
    - `Link do vídeo`: `video_url`
    - `Horário no original`: `original_time` (tempo absoluto do vídeo, ex.: 01:12:05 a 01:12:41)
-   - `Corte sugerido no arquivo`: `suggested_cut_in_file` (ex.: 0:10 a 0:47)
+   - `Corte sugerido no arquivo`: `suggested_cut_in_file` (sem folga é o arquivo inteiro, ex.: 0:00 a 0:28;
+     com folga, ex.: 0:10 a 0:38)
    - `Arquivo`: caminho do .mp4 (`file`)
    - `Estilo`: cam / nocam
    - `Tipo de momento`: `type` do corte (Reação, Fail, Jogada, Piada, História, Discussão)
@@ -353,8 +402,8 @@ O Notion não é mexido. Por isso:
 
 ## Como o usuário edita depois
 
-- **Gancho:** "corte N: GANCHO" (passo 7). **Tempo do corte:** editar `start`/`end` em
-  `clips.json` e rodar `make_shorts.py work/<id> --only N`. Se mudar título, descrição ou hashtags, atualize também a linha do Notion.
+- **Gancho:** "corte N: GANCHO" (passo 7). **Tempo do corte:** "corte N: começa/termina X s antes/depois" ou
+  "esse com folga" (passo 7b). Se mudar título, descrição ou hashtags, atualize também a linha do Notion.
 - **Visual** (cores, tamanhos, posição, logo, nome do canal): `templates/cam.json` ou `nocam.json`.
 - Antes de sobrescrever shorts já aprovados, guarde cópia (ex.: `shorts_antigo/`).
 

@@ -12,7 +12,7 @@ detecta com o modelo tiny e usa o idioma que mais aparece (config.json -> langua
 work/<id>/lang.json; as transcrições seguintes usam esse idioma. --language força outro.
 
 Com --candidates/--range, só esses trechos são transcritos e trocados dentro do transcript.json existente.
-A margem dos candidatos (--pad) é no mínimo max(pad_before, pad_after), para a legenda cobrir os extras do short.
+A margem dos candidatos (--pad) é no mínimo max(pad_before, pad_after, pad_folga), para a legenda cobrir um corte com folga.
 """
 import argparse
 import json
@@ -136,7 +136,7 @@ def main():
     ap.add_argument("--language", help="força o idioma (ex.: pt, en); sem isso usa lang.json / detecção")
     ap.add_argument("--range", action="append", help="só transcreve S-E (hh:mm:ss); pode repetir")
     ap.add_argument("--candidates", help="JSON [{start,end}] (seg ou hh:mm:ss): só esses trechos (passada small)")
-    ap.add_argument("--pad", type=float, help="margem antes/depois de cada candidato (mín. max(pad_before, pad_after))")
+    ap.add_argument("--pad", type=float, help="margem antes/depois de cada candidato (mín. max(pad_before, pad_after, pad_folga))")
     ap.add_argument("--detect-only", action="store_true", help="só detecta o idioma e grava lang.json")
     a = ap.parse_args()
 
@@ -156,7 +156,7 @@ def main():
     pcfg = cfg.get("transcribe_refine" if refine else "transcribe_fast", {})
     model_name = a.model or pcfg.get("model", "small" if refine else "tiny")
     beam = a.beam or pcfg.get("beam", 5 if refine else 1)
-    min_pad = max(float(cfg.get("pad_before", 10)), float(cfg.get("pad_after", 10)))
+    min_pad = max(float(cfg.get("pad_before", 0)), float(cfg.get("pad_after", 0)), float(cfg.get("pad_folga", 10)))
     pad = max(a.pad if a.pad is not None else float(cfg.get("transcribe_refine", {}).get("pad_seconds", 10)), min_pad)
 
     total = media_duration(a.video)

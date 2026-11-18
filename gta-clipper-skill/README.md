@@ -14,7 +14,7 @@ Cole o link de uma live ou VOD (YouTube, Twitch, Kick...) e o Claude:
 5. **Retranscreve só os candidatos com o small** (palavras precisas para a legenda).
 6. **Renderiza** cada corte em 1080x1920 com card de gancho e legenda palavra por palavra, com **10 s extras
    antes e depois** para o ajuste fino no editor. Vídeo gringo: legenda traduzida para português pelo Claude.
-7. **Entrega** o preview, o kit de postagem (título, descrição, hashtags, corte sugerido no arquivo) e
+7. **Entrega** o preview, o kit de postagem (título, descrição, hashtags, corte sugerido no arquivo (o arquivo inteiro: o short já sai no corte exato)) e
    **registra cada short no Notion** (base "Resultados dos Cortes").
 
 **Histórico:** cada vídeo/live tem um arquivo em `work/historico/` com o que já foi cortado. Mandar o mesmo link

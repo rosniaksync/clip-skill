@@ -34,9 +34,8 @@ Use estas regras para ranquear os candidatos. Um corte precisa de pelo menos 2 d
 
 ## Gancho (os 2 primeiros segundos decidem tudo)
 
-- O corte sugerido começa no pico ou 1 segundo antes. Nunca começa em cumprimento, "então, tipo...",
-  silêncio, menu ou tela de carregamento. (O arquivo final ainda leva 10 segundos extras antes e depois,
-  para o ajuste fino no editor.)
+- O corte começa no gancho (ver "Início e fim perfeitos" abaixo). O arquivo é o corte exato, postado sem
+  editar: não há mais ajuste fino no editor.
 - Se o desfecho está no fim, comece na frase mais dramática e deixe a construção rolar, cortando o
   máximo possível da preparação.
 - O texto do gancho cria curiosidade, não descreve: "ELE NÃO ESPERAVA ISSO" é melhor que
@@ -46,8 +45,29 @@ Use estas regras para ranquear os candidatos. Um corte precisa de pelo menos 2 d
 
 - A partir de 20 segundos, sem máximo fixo (ver `config.json`). Abaixo de 30 segundos tende a ser
   reassistido mais; passe de 59 segundos só quando a história pede. Nunca encha linguiça.
-- Termine no desfecho ou na reação, 0,3 a 0,8 segundo depois da última palavra.
-- Um final que emenda com o começo (loop) aumenta as reassistidas.
+- Termine no desfecho ou na reação (ver "Início e fim perfeitos" abaixo).
+
+## Início e fim perfeitos
+
+O short é postado direto, sem editar. Confira cada corte com `scripts/check_cut.py work/<id> --clip N`
+(palavras, volume a cada 0,1 s, trocas de cena e frames do início e do fim) antes de renderizar.
+
+### Início
+- Começa no gancho: a primeira frase ou ação que já prende. Nunca em cumprimento, "então", "tipo", silêncio,
+  menu ou loading.
+- Se precisar de contexto, usa só a frase mínima (até ~3 s) antes do gancho.
+- Corta em fronteira de palavra: início = começo da primeira palavra menos 0,15 s. Nunca no meio de uma palavra
+  ou de uma sílaba.
+- Momento visual (batida, fuga, susto): começa 0,5 a 1 s antes da ação, conferido nos frames.
+- Não começa num corte de câmera ou transição.
+
+### Fim
+- Termina 0,3 a 0,8 s depois da última palavra do desfecho ou da reação.
+- Se termina em risada ou grito, corta quando o som começa a cair, nunca no meio do pico.
+- Nada depois do desfecho: sem "bom", "enfim", "chat", troca de assunto.
+- Quando der, prefere um final que emende com o começo (loop).
+- Se houver troca de cena ou corte de edição logo depois (comum em VOD editado do YouTube), o fim fica antes
+  dela, mesmo que a folga depois da última palavra fique menor que 0,3 s.
 
 ## Vídeo gringo
 
