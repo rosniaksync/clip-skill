@@ -15,16 +15,12 @@
   ],
   "clip_max_seconds": null,
   "pre_roll_seconds": 15,
-  "pad_before": 10,
-  "pad_after": 10,
-  "chunk_minutes": 30,
-  "chunk_minutes_options": [
-    30
-  ],
-  "single_block_max_minutes": 60,
-  "_chunk_note": "Até 60 min de vídeo/live = um bloco só (sem dividir). Mais de 60 min = blocos de 30 min. Nunca blocos de 60.",
+  "pad_before": 0,
+  "pad_after": 0,
+  "pad_folga": 10,
+  "_pad_note": "pad_before/pad_after = 0: o short sai exatamente no corte escolhido (pronto para postar). Corte com \"folga\": true no clips.json (pedido \"esse com folga\") ganha pad_folga s antes e depois.",
   "ask_reels_each_link": true,
-  "_ask_reels_note": "A cada link novo, perguntar ao usuário quantos reels quer por bloco de 30 min (AskUserQuestion). A resposta é um TETO, não meta: só cortes realmente bons, bloco fraco entrega menos, nunca completar com corte fraco. Resposta vale só para aquele link.",
+  "_ask_reels_note": "A cada link novo, perguntar ao usuário quantos reels quer por bloco (AskUserQuestion). A resposta é um TETO, não meta: só cortes realmente bons, bloco fraco entrega menos, nunca completar com corte fraco. Resposta vale só para aquele link.",
   "chunk_overlap_minutes": 5,
   "max_parallel_jobs": 2,
   "auto_next_block": true,
@@ -60,7 +56,7 @@
     "model": "small",
     "beam": 5,
     "pad_seconds": 10,
-    "_note": "pad_seconds é a margem da retranscrição dos candidatos; o script usa no mínimo max(pad_before, pad_after)."
+    "_note": "pad_seconds é a margem da retranscrição dos candidatos; o script usa no mínimo max(pad_before, pad_after, pad_folga), para a legenda cobrir um corte com folga e o check_cut.py ter as palavras precisas em volta do início e do fim."
   },
   "captions_translation": {
     "target": "pt",
@@ -198,5 +194,9 @@
     "canais_data_source": "collection://41a43190-4def-8125-a1bb-000b848717e9",
     "progresso_data_source": "collection://41b43190-4def-81af-ad5c-000b0f2ff8c8",
     "min_rows_for_patterns": 20
-  }
+  },
+  "ask_blocks_each_link": true,
+  "_ask_blocks_note": "A cada link novo, perguntar quantos blocos separar (junto com a pergunta dos reels). O trecho a cortar é dividido em K blocos iguais (ex.: 44 min em 2 = 2 de 22 min). O download de cada bloco depois do primeiro começa chunk_overlap_minutes antes (no máximo 1/4 do bloco) para não perder momento na divisa; cortes repetidos são descartados.",
+  "ask_duration_each_link": true,
+  "_ask_duration_note": "A cada link (vídeo ou live), perguntar primeiro quanto tempo cortar a partir do começo ou do 'Continuar de' (opções: tudo + 2 ou 3 tempos redondos). Depois perguntar blocos e reels sobre esse tempo. O que não for cortado fica para a próxima vez."
 }

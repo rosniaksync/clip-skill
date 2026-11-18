@@ -2,8 +2,8 @@
 
 Cole o link de uma live ou VOD (YouTube, Twitch, Kick...) e o Claude:
 
-1. **Baixa o vídeo inteiro em blocos** (até 1080p), sem perguntar nada: o Claude decide se faz blocos de 30 min
-   ou de 1 hora (30 min para live no ar, vídeo curto ou muito agitado; 1 hora para VOD longo ou conteúdo calmo). Na Twitch baixa também o chat; no YouTube guarda o mapa de
+1. **Pergunta quanto tempo cortar, quantos blocos e quantos reels por bloco** e baixa o vídeo inteiro dividido em blocos iguais
+   (até 1080p; ex.: 44 min em 2 blocos = 2 de 22 min). Na Twitch baixa também o chat; no YouTube guarda o mapa de
    "mais repetidos" (heatmap). Mede o início real do trecho (o corte por cópia começa no keyframe anterior).
    Live ainda no ar: na Twitch usa o VOD da live atual; no YouTube baixa só o que já passou.
 2. **Detecta o idioma** sozinho (3 a 5 trechos de 30 s do meio do vídeo, modelo tiny) e **transcreve o vídeo
@@ -14,7 +14,7 @@ Cole o link de uma live ou VOD (YouTube, Twitch, Kick...) e o Claude:
 5. **Retranscreve só os candidatos com o small** (palavras precisas para a legenda).
 6. **Renderiza** cada corte em 1080x1920 com card de gancho e legenda palavra por palavra, com **10 s extras
    antes e depois** para o ajuste fino no editor. Vídeo gringo: legenda traduzida para português pelo Claude.
-7. **Entrega** o preview, o kit de postagem (título, descrição, hashtags, corte sugerido no arquivo) e
+7. **Entrega** o preview, o kit de postagem (título, descrição, hashtags, corte sugerido no arquivo (o arquivo inteiro: o short já sai no corte exato)) e
    **registra cada short no Notion** (base "Resultados dos Cortes").
 
 **Histórico:** cada vídeo/live tem um arquivo em `work/historico/` com o que já foi cortado. Mandar o mesmo link
