@@ -7,7 +7,7 @@ tem sempre o mesmo id, então mandar o link de novo continua de onde parou).
 Uso:
   progress.py show <info.json | work/<id>>   # o que já foi feito e de onde continuar
   progress.py check work/<id>                # cortes do clips.json que repetem cortes já feitos
-  progress.py done work/<id> [--block-minutes 30|60]   # no fim de CADA bloco: grava o trecho e os shorts dele
+  progress.py done work/<id> [--block-minutes N]   # no fim de CADA bloco: grava o trecho e os shorts dele
   progress.py notion work/<id>               # campos da linha em "Progresso dos Vídeos" (Notion)
   progress.py set-notion work/<id> <page_id> # guarda o id da linha do Notion (para atualizar a mesma)
 """
@@ -96,7 +96,7 @@ def main():
     ap.add_argument("cmd", choices=["show", "check", "done", "notion", "set-notion"])
     ap.add_argument("target")
     ap.add_argument("page_id", nargs="?", help="com set-notion: id da linha em Progresso dos Vídeos")
-    ap.add_argument("--block-minutes", type=float, help="com done: tamanho de bloco escolhido (30 ou 60)")
+    ap.add_argument("--block-minutes", type=float, help="com done: tamanho do bloco em minutos (vídeo dividido em K blocos iguais)")
     a = ap.parse_args()
     info = load_info(a.target)
     path, hist = load_hist(info, cfg)

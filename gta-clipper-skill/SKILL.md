@@ -29,18 +29,20 @@ registra cada short no Notion.
   o arquivo ganha `pad_folga` (10 s) antes e depois, e o kit mostra onde o corte fica (ex.: 0:10 a 0:38).
 - **Recuo antes do pico:** `pre_roll_seconds` (15 s): a reação vem depois do fato. Depois apare para a primeira
   frase/ação forte (gancho primeiro).
-- **Sempre o vídeo inteiro. Curto = um bloco só; longo = blocos de 30 min (nunca 60).** Nunca pergunte qual
-  trecho nem o tamanho do bloco.
-  - **Até 1 hora** (`single_block_max_minutes` = 60; vale para vídeo de 40 min, de 50 min e para live que ainda
-    não passou de 1 h): **um bloco só**, baixado inteiro (sem `--section`), sem dividir.
-  - **Mais de 1 hora** (vídeo ou live): divide em blocos de 30 min (B = 30, `chunk_minutes`), como abaixo.
-  - Live no ar: conta o que já passou. Se tem 45 min, é um bloco só; quando o usuário mandar o link de novo
-    e já passar de 1 h, o histórico continua de onde parou e daí em diante vai em blocos de 30 min.
-  O bloco N (só quando passar de 1 h) vai de (N−1)·30 menos 5 min (`chunk_overlap_minutes`) até N·30, via `download.py --section` (o bloco 1
-  começa em 0:00 e o último termina no fim do vídeo): 00:00:00-00:30:00, 00:25:00-01:00:00,
-  00:55:00-01:30:00… Descarte cortes repetidos na sobreposição.
+- **Sempre o vídeo inteiro, dividido em quantos blocos o usuário pedir** (pergunta a cada link, ver passo −1;
+  `ask_blocks_each_link`). Nunca pergunte qual trecho: é sempre o vídeo inteiro (live no ar: tudo o que já
+  passou; link com histórico: o que falta, a partir do "Continuar de").
+  - O trecho a cortar (duração D) é dividido em **K blocos iguais** (K = resposta do usuário): cada bloco tem
+    D/K. Ex.: 44 min em 2 blocos → 2 blocos de 22 min (00:00:00–00:22:00 e 00:22:00–00:44:00). 1 bloco = o vídeo
+    inteiro, baixado sem `--section`.
+  - Para não perder um momento que caia bem na divisa, o download do bloco N (N > 1) começa
+    `chunk_overlap_minutes` (5 min) antes do início dele, limitado a um quarto do tamanho do bloco; os cortes
+    repetidos nessa sobra são descartados (`progress.py check`). Para o usuário, os blocos continuam sendo os
+    trechos iguais (ex.: 22 + 22 min).
+  - Se a divisão der um tempo quebrado, arredonde o fim de cada bloco para o minuto inteiro mais próximo; o
+    último bloco sempre termina no fim do vídeo.
 - **Quantos shorts: o usuário diz, a cada link.** Antes de começar qualquer vídeo/live, pergunte com
-  `AskUserQuestion`: "Quantos reels você quer por bloco de 30 min?" (opções: até 3, até 5, só o melhor, ou outro
+  `AskUserQuestion`: "Quantos reels você quer por bloco?" (opções: até 3, até 5, só o melhor, ou outro
   número). A resposta vale para aquele link inteiro (todos os blocos) e vira o teto N do bloco. N é um **teto**,
   não uma meta: entregue só cortes **realmente bons** pelas regras de `references/viral-rules.md`; bloco fraco
   entrega menos que N, ou nenhum. Nunca complete número com corte fraco. Passou de N bons: fique com os N de
@@ -114,13 +116,17 @@ mesmo id, então mandar o link de novo continua de onde parou. Detalhes: `python
 - Nos dois casos, ao terminar o que já passou, diga em uma linha: "A live continua. Me mande o link de novo
   depois que eu continuo de HH:MM:SS, sem repetir" (o histórico guarda onde parou).
 
-**Uma única pergunta por link: quantos reels por bloco** (ver "Quantos shorts"). Faça essa pergunta logo depois do
-`--probe` e antes de baixar, e espere a resposta. Fora essa, **não faça perguntas.** Não pergunte qual trecho nem o
-tamanho do bloco: é sempre o vídeo inteiro (live no ar: tudo o que já passou), num bloco só até 1 h e em blocos
-de 30 min acima disso (ver "Sempre o vídeo inteiro").
+**Duas perguntas por link, juntas num único `AskUserQuestion`, logo depois do `--probe` e antes de baixar:**
+1. **"Quantos blocos você quer que eu separe?"** Mostre a duração do trecho a cortar na pergunta e, em cada
+   opção, o tamanho que cada bloco teria (ex.: para 44 min: "1 bloco (44 min)", "2 blocos (22 min cada)",
+   "3 blocos (~15 min cada)"; o usuário pode digitar outro número).
+2. **"Quantos reels você quer por bloco?"** (ver "Quantos shorts").
+Espere as duas respostas. As duas valem só para aquele link; no link seguinte, pergunte de novo. Fora essas,
+**não faça perguntas.** Não pergunte qual trecho (é sempre o vídeo inteiro; live no ar: tudo o que já passou).
 Também não pergunte sobre permissão de repostagem (o usuário já disse que tem), nome do canal, card, webcam,
-idioma, modelo, cores. Antes de tudo, diga em uma ou duas linhas: o resumo do vídeo (título, canal, duração),
-se é um bloco só (até 1 h) ou quantos blocos de 30 min (acima de 1 h) e quanto deve demorar. Depois comece.
+idioma, modelo, cores. Depois das respostas, diga em uma ou duas linhas: o resumo do vídeo (título, canal,
+duração), os blocos com os horários (ex.: "2 blocos: 0:00–22:00 e 22:00–44:00") e quanto deve demorar. Depois
+comece.
 
 ## Passo 0 — Conferir instalação (primeira vez ou PC novo)
 
@@ -302,7 +308,7 @@ Avise o usuário em qual pasta numerada os shorts ficaram. No Notion, o campo `A
 ## Passo 6b — Gravar no histórico (fim de CADA bloco, sempre)
 
 ```
-python scripts/progress.py done work/<id> --block-minutes <30|60>
+python scripts/progress.py done work/<id> --block-minutes <tamanho do bloco em minutos>
 ```
 Grava o trecho do bloco (tempo do original, com o offset real) e os shorts renderizados no histórico do vídeo.
 Rode mesmo quando o bloco não teve nenhum short: assim o trecho conta como já visto. Depois atualize a linha
