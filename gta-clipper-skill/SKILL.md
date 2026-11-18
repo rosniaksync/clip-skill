@@ -218,7 +218,7 @@ Descarte o que não faz sentido sem contexto. Cada corte começa no gancho e ter
 ]
 ```
 - `aviso` (opcional): alerta que sai no kit de postagem, ex.: "música do jogo alta: risco de som mudo".
-- `title`, `description` e `hashtags` são **obrigatórios** em todo corte (vão para o kit e para o Notion).
+- `title`, `description` e `hashtags` são **obrigatórios** em todo corte (vão para o kit; título e hashtags também para o Notion).
 - `style`: `"cam"` (com webcam) ou `"nocam"`. `hook` = a frase do card, UMA frase só (até ~8 palavras, sem emoji,
   em português); o script quebra em 2 linhas sozinho. Não use `subhook`. `title`, `description`, `hashtags` vão para o kit de postagem.
 - `type`: Reação, Fail, Jogada, Piada, História ou Discussão (fica no `renders.json`; o Notion não usa mais).
@@ -336,13 +336,14 @@ Os dados de cada short estão em `shorts/renders.json`. Base de progresso: `prog
 ("Progresso dos Vídeos").
 
 Para cada short renderizado:
-1. **Linha em "Resultados dos Cortes"** (só o que o usuário precisa para postar; aprovado em 17/11/2026):
+1. **Linha em "Resultados dos Cortes"** (só o que o usuário precisa para postar: Gancho, Título, Hashtags e Arquivo;
+   aprovado em 17/11/2026):
    - `Gancho` (título): **um texto só**, sem barra: `hook_text` do `renders.json` (ex.: "EXPLODIU TUDO NA CARA
      DA POLÍCIA")
-   - `Título`, `Descrição`, `Hashtags`: os mesmos do kit de postagem (`title`, `description`, `hashtags`,
-     hashtags separadas por espaço). Sempre preencha os três.
+   - `Título`, `Hashtags`: os mesmos do kit de postagem (`title`, `hashtags` separadas por espaço). Sempre
+     preencha os dois. A descrição fica só no kit (não vai para o Notion).
    - `Arquivo`: caminho final do .mp4 na pasta numerada (`final_file` do `renders.json`, depois do passo 6a)
-   Só esses 5 campos: não crie outros nesta base. Grave o id da página criada no corte (`"notion_page_id"` no
+   Só esses 4 campos: não crie outros nesta base. Grave o id da página criada no corte (`"notion_page_id"` no
    `clips.json`). Se o corte já tiver `notion_page_id` (gancho trocado, tempo ajustado), **atualize essa linha**
    (`Gancho`, `Arquivo` e o que mais mudou), não crie outra.
 2. **Base de canais** ("Canais para Cortes", opcional): se existir e não estiver na lixeira, procure o canal
@@ -398,7 +399,7 @@ O Notion não é mexido. Por isso:
 ## Como o usuário edita depois
 
 - **Gancho:** "corte N: GANCHO" (passo 7). **Tempo do corte:** "corte N: começa/termina X s antes/depois" ou
-  "esse com folga" (passo 7b). Se mudar título, descrição ou hashtags, atualize também a linha do Notion.
+  "esse com folga" (passo 7b). Se mudar título ou hashtags, atualize também a linha do Notion.
 - **Visual** (cores, tamanhos, posição, logo, nome do canal): `templates/cam.json` ou `nocam.json`.
 - Antes de sobrescrever shorts já aprovados, guarde cópia (ex.: `shorts_antigo/`).
 
