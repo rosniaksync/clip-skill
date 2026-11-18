@@ -336,14 +336,19 @@ Os dados de cada short estão em `shorts/renders.json`. Base de progresso: `prog
 ("Progresso dos Vídeos").
 
 Para cada short renderizado:
-1. **Linha em "Resultados dos Cortes"** (só o que o usuário precisa para postar: Gancho, Título, Hashtags e Arquivo;
+1. **Linha em "Resultados dos Cortes"** (só o que o usuário precisa para postar: Gancho, Título, Hashtags e Arquivo, mais o Link para separar;
    aprovado em 17/11/2026):
    - `Gancho` (título): **um texto só**, sem barra: `hook_text` do `renders.json` (ex.: "EXPLODIU TUDO NA CARA
      DA POLÍCIA")
    - `Título`, `Hashtags`: os mesmos do kit de postagem (`title`, `hashtags` separadas por espaço). Sempre
      preencha os dois. A descrição fica só no kit (não vai para o Notion).
    - `Arquivo`: caminho final do .mp4 na pasta numerada (`final_file` do `renders.json`, depois do passo 6a)
-   Só esses 4 campos: não crie outros nesta base. Grave o id da página criada no corte (`"notion_page_id"` no
+   - `Link` (seleção): `"N · <título do vídeo>"`, com N = número da pasta desse link
+     (`shorts\_registro.json` → `links`, o mesmo de `C:\cortes\shorts\N`) e o título do `info.json`, ex.:
+     `"1 · iShowSpeed Plays I Wanna Test This Game.."`. Todos os blocos do mesmo link usam a mesma opção. Link
+     novo: crie a opção (`ALTER COLUMN "Link"` listando as opções antigas + a nova, cor diferente da anterior).
+     A visão "Por link" agrupa a tabela por esse campo, um bloco por link.
+   Só esses 5 campos: não crie outros nesta base. Grave o id da página criada no corte (`"notion_page_id"` no
    `clips.json`). Se o corte já tiver `notion_page_id` (gancho trocado, tempo ajustado), **atualize essa linha**
    (`Gancho`, `Arquivo` e o que mais mudou), não crie outra.
 2. **Base de canais** ("Canais para Cortes", opcional): se existir e não estiver na lixeira, procure o canal
