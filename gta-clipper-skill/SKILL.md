@@ -26,7 +26,7 @@ registra cada short no Notion.
   do `clips.json`, que você escolhe pelas regras de "Início e fim perfeitos" (`references/viral-rules.md`) e
   confere com `check_cut.py` (passo 4d). O "corte sugerido no arquivo" é o arquivo inteiro (ex.: 0:00 a 0:28).
 - **Com folga (só quando o usuário pedir "esse com folga"):** ponha `"folga": true` no corte e renderize só ele;
-  o arquivo ganha `pad_folga` (10 s) antes e depois, e o kit/Notion mostram onde o corte fica (ex.: 0:10 a 0:38).
+  o arquivo ganha `pad_folga` (10 s) antes e depois, e o kit mostra onde o corte fica (ex.: 0:10 a 0:38).
 - **Recuo antes do pico:** `pre_roll_seconds` (15 s): a reação vem depois do fato. Depois apare para a primeira
   frase/ação forte (gancho primeiro).
 - **Sempre o vídeo inteiro. Curto = um bloco só; longo = blocos de 30 min (nunca 60).** Nunca pergunte qual
@@ -221,7 +221,7 @@ Descarte o que não faz sentido sem contexto. Cada corte começa no gancho e ter
 - `title`, `description` e `hashtags` são **obrigatórios** em todo corte (vão para o kit e para o Notion).
 - `style`: `"cam"` (com webcam) ou `"nocam"`. `hook` = a frase do card, UMA frase só (até ~8 palavras, sem emoji,
   em português); o script quebra em 2 linhas sozinho. Não use `subhook`. `title`, `description`, `hashtags` vão para o kit de postagem.
-- `type` (para o Notion): Reação, Fail, Jogada, Piada, História ou Discussão.
+- `type`: Reação, Fail, Jogada, Piada, História ou Discussão (fica no `renders.json`; o Notion não usa mais).
 - `start`/`end` = o corte exato do arquivo (com 2 casas decimais, ex.: `00:08:14.73`), conferido no passo 4d.
 - Opcionais: `"folga": true` (só se o usuário pedir), `"captions": false`, `"cam": [x,y,w,h]`, `"captions_pt"` (passo 4c), `"notion_page_id"` (passo 8).
 
@@ -306,7 +306,7 @@ python scripts/progress.py done work/<id> --block-minutes <30|60>
 ```
 Grava o trecho do bloco (tempo do original, com o offset real) e os shorts renderizados no histórico do vídeo.
 Rode mesmo quando o bloco não teve nenhum short: assim o trecho conta como já visto. Depois atualize a linha
-do vídeo em "Progresso dos Vídeos" no Notion (passo 8, item 5).
+do vídeo em "Progresso dos Vídeos" no Notion (passo 8, item 3).
 
 ## Passo 7 — Trocar gancho (quando o usuário pedir)
 
@@ -324,8 +324,8 @@ O modo bloco por bloco continua sozinho.
 Em todos: edite só o corte N no `clips.json`, rode `check_cut.py work/<id> --clip N` para ver se o novo ponto não
 caiu no meio de palavra ou numa transição (avise em uma linha se cair, mas faça o que o usuário pediu), exporte e
 ajuste o `captions_pt` se for gringo, rode `make_shorts.py work/<id> --only N`, `organize_shorts.py` e
-`progress.py done work/<id>`, e atualize a **mesma** linha do Notion (`Corte sugerido no arquivo`, `Horário no
-original`, `Arquivo`; pelo `notion_page_id`, nunca crie outra).
+`progress.py done work/<id>`, e atualize a **mesma** linha do Notion se o `Arquivo` mudar (pelo
+`notion_page_id`, nunca crie outra).
 
 ## Passo 8 — Registrar no Notion (automático)
 
@@ -336,43 +336,35 @@ Os dados de cada short estão em `shorts/renders.json`. Base de progresso: `prog
 ("Progresso dos Vídeos").
 
 Para cada short renderizado:
-1. **Canal:** procure o canal na base de canais (título `Canal`). Se não existir, crie com `Canal`, `Link`
-   (link do canal, `channel_url`/`uploader_url` do `info.json`), `Plataforma` (YouTube, Twitch, Kick ou Outro)
-   e `Status` "Cortando".
-2. **Linha em "Resultados dos Cortes":**
-   - `Gancho` (título): **um texto só**, sem barra: `hook_text` do `renders.json` (linha 1 e linha 2 do card
-     juntas numa frase, ex.: "EXPLODIU TUDO NA CARA DA POLÍCIA")
-   - `Canal`: relação com a página do canal
-   - `Data do corte`: hoje
-   - `Link do vídeo`: `video_url`
-   - `Horário no original`: `original_time` (tempo absoluto do vídeo, ex.: 01:12:05 a 01:12:41)
-   - `Corte sugerido no arquivo`: `suggested_cut_in_file` (sem folga é o arquivo inteiro, ex.: 0:00 a 0:28;
-     com folga, ex.: 0:10 a 0:38)
-   - `Arquivo`: caminho do .mp4 (`file`)
-   - `Estilo`: cam / nocam
-   - `Tipo de momento`: `type` do corte (Reação, Fail, Jogada, Piada, História, Discussão)
-   - `Idioma de origem`: PT ou Gringo (`origin_language`)
+1. **Linha em "Resultados dos Cortes"** (só o que o usuário precisa para postar; aprovado em 17/11/2026):
+   - `Gancho` (título): **um texto só**, sem barra: `hook_text` do `renders.json` (ex.: "EXPLODIU TUDO NA CARA
+     DA POLÍCIA")
    - `Título`, `Descrição`, `Hashtags`: os mesmos do kit de postagem (`title`, `description`, `hashtags`,
      hashtags separadas por espaço). Sempre preencha os três.
-   - `Status`: "Renderizado"
-   Grave o id da página criada no corte (`"notion_page_id"` no `clips.json`). Se o corte já tiver
-   `notion_page_id` (gancho trocado e renderizado de novo), **atualize essa linha**, não crie outra.
-3. **Base de canais:** `Cortes feitos` +1 e `Último corte` = hoje (só para linha nova, não para atualização).
-4. Não preencha Views 24h, Views 7d, Retenção %, Postado em, Data da postagem nem Observação (são do usuário).
-5. **Progresso do vídeo** (uma linha por vídeo/live, no fim de cada bloco, depois do `progress.py done`):
+   - `Arquivo`: caminho final do .mp4 na pasta numerada (`final_file` do `renders.json`, depois do passo 6a)
+   Só esses 5 campos: não crie outros nesta base. Grave o id da página criada no corte (`"notion_page_id"` no
+   `clips.json`). Se o corte já tiver `notion_page_id` (gancho trocado, tempo ajustado), **atualize essa linha**
+   (`Gancho`, `Arquivo` e o que mais mudou), não crie outra.
+2. **Base de canais** ("Canais para Cortes", opcional): se existir e não estiver na lixeira, procure o canal
+   (título `Canal`); se não existir, crie com `Canal`, `Link` (`channel_url`/`uploader_url` do `info.json`),
+   `Plataforma` (YouTube, Twitch, Kick ou Outro) e `Status` "Cortando". Para cada short novo: `Cortes feitos` +1
+   e `Último corte` = hoje. Se a base estiver na lixeira ou der erro, pule este item sem avisar a cada short
+   (uma linha no fim do bloco basta).
+3. **Progresso do vídeo** (uma linha por vídeo/live, no fim de cada bloco, depois do `progress.py done`):
    `python scripts/progress.py notion work/<id>` imprime os campos prontos: `Vídeo`, `Status` (Em andamento /
    Live continua / Concluído), `Aviso` (ex.: "A live continua. Me mande o link de novo depois que eu continuo de
    00:35:00, sem repetir."), `Continuar de`, `Cortado até`, `Trechos cortados`, `Shorts feitos`, `Blocos feitos`,
    `Tamanho do bloco`, `Plataforma`, `Link do vídeo`, `ID do vídeo`, `Última atualização`; e `Canal` = relação
-   com a página do canal. Se `notion_page_id` vier vazio, crie a linha e guarde o id com
+   com a página do canal (só se a base de canais estiver ativa). Se `notion_page_id` vier vazio, crie a linha e guarde o id com
    `progress.py set-notion work/<id> <page_id>`; se vier preenchido, **atualize essa linha** (nunca crie outra).
    Se o histórico local sumir, procure a linha pelo `ID do vídeo` antes de criar.
 
 Se o Notion não estiver disponível, renderize normal e avise em uma linha ("Notion indisponível: os shorts não
 foram registrados"); não trave.
 
-**Análise (só quando o usuário pedir):** leia a base de resultados, mas só aponte padrões se houver **20 ou mais
-linhas com views preenchidas** (`notion.min_rows_for_patterns`). Com menos, diga quantas faltam.
+**Análise (só quando o usuário pedir):** a base de resultados não guarda mais views nem retenção. Se o usuário
+pedir análise de desempenho, diga isso e pergunte se ele quer voltar a anotar views (precisa de 20 ou mais
+shorts com views, `notion.min_rows_for_patterns`).
 
 ## Limpeza do dia (automática, ao ligar o note)
 
