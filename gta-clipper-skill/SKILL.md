@@ -425,8 +425,9 @@ abrir o jogo + os melhores momentos dos primeiros 30 min de jogo**, rápido, sem
      cada 2 min) até ver o jogo na tela. Pare na primeira janela em que o jogo aparece.
    - Live no ar em que o jogo ainda não apareceu em nada do que já passou: diga "ainda não abriu o jogo, me
      manda de novo daqui a pouco" e passe para o próximo link. Não fique checando sozinho.
-4. **Trecho a cortar:** da abertura (A) até A + 30 min (`abertura.minutes_after` no config; live no ar: até
-   agora). Baixe esse trecho com `--section` (começando 1 min antes de A, para pegar a reação) num bloco só,
+4. **Trecho a cortar:** da abertura (A) até A + 30 min (`abertura.minutes_after` no config). 30 min é o
+   **máximo**, não um mínimo: se depois da abertura tiver menos (live no ar com só 20 min de jogo até agora, ou
+   vídeo que acaba antes), corte o que tiver e escolha os melhores momentos disso normalmente. Baixe esse trecho com `--section` (começando 1 min antes de A, para pegar a reação) num bloco só,
    `work/<id>-abertura/`.
 5. **Cortes** (passos 2 a 6 normais, com as regras de "Início e fim perfeitos" e `check_cut.py`):
    - **Short 1 = a abertura**: começa na reação ao abrir o jogo (não na espera do loading) e termina no fim da
