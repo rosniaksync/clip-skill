@@ -273,6 +273,11 @@ def main():
                               "is_live": is_live, "live_status": info.get("live_status"),
                               "heatmap_points": len(heat), "extractor": info.get("extractor_key"), "id": info.get("id")},
                              ensure_ascii=False, indent=1))
+            chaps = info.get("chapters") or []
+            if chaps:   # Twitch VOD: um capítulo por categoria/jogo (mostra quando ele abriu o jogo)
+                print("Capítulos (categoria/jogo):")
+                for c in chaps:
+                    print(f"  {ts(c.get('start_time') or 0)}–{ts(c.get('end_time') or 0)}  {c.get('title')}")
             hist = read_json(history_path(info.get("extractor_key"), info.get("id"), cfg))
             if hist and hist.get("blocks"):
                 spans, covered, n = history_summary(hist)

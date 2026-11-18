@@ -1,6 +1,6 @@
 ---
 name: gta-clipper-skill
-description: Transforma qualquer live ou vídeo longo (YouTube, Twitch VOD, Kick etc.) em shorts verticais prontos para postar (1080x1920, card de gancho, legenda palavra por palavra, início e fim exatos, pronto para postar sem editar). Use quando o usuário colar um link de live/vídeo e pedir shorts, cortes, reels ou clips.
+description: Transforma qualquer live ou vídeo longo (YouTube, Twitch VOD, Kick etc.) em shorts verticais prontos para postar (1080x1920, card de gancho, legenda palavra por palavra, início e fim exatos, pronto para postar sem editar). Use quando o usuário colar um link de live/vídeo e pedir shorts, cortes, reels ou clips, ou mandar "abertura" + link (reação ao abrir o jogo + melhores momentos).
 ---
 
 # Live → Shorts virais
@@ -118,7 +118,7 @@ mesmo id, então mandar o link de novo continua de onde parou. Detalhes: `python
 - Nos dois casos, ao terminar o que já passou, diga em uma linha: "A live continua. Me mande o link de novo
   depois que eu continuo de HH:MM:SS, sem repetir" (o histórico guarda onde parou).
 
-**Três perguntas por link (vídeo ou live), em duas rodadas, logo depois do `--probe` e antes de baixar:**
+**Três perguntas por link (vídeo ou live), em duas rodadas, logo depois do `--probe` e antes de baixar** (exceto no **modo abertura**, que não pergunta nada; ver a seção dele):
 
 Rodada 1, sozinha (o tamanho dos blocos depende dela):
 1. **"Quanto tempo você quer que eu corte?"** Diga na pergunta quanto o vídeo/live tem e de onde começo, ex.:
@@ -406,6 +406,38 @@ O Notion não é mexido. Por isso:
 - No dia seguinte, o mesmo link continua de onde parou (pelo histórico), sem repetir.
 - Trocar gancho de um short do dia anterior não dá mais (os arquivos foram apagados): é preciso cortar de novo.
 - Teste sem apagar: `python scripts/cleanup.py --dry-run`. Registro das limpezas: `historico/limpeza.log`.
+
+## Modo abertura (lançamento do jogo: "abertura" + link)
+
+Quando o usuário manda um link (Twitch ou YouTube, live no ar ou VOD) com a palavra **"abertura"** (ou pede "a
+abertura do jogo" de um ou vários links), use este modo em vez do fluxo normal. Objetivo: **o short da reação ao
+abrir o jogo + os melhores momentos dos primeiros 30 min de jogo**, rápido, sem perguntas.
+
+1. **Sem perguntas.** Não faça as perguntas de tempo, blocos e reels. Vários links: faça em fila, um de cada vez
+   (download do próximo pode rodar enquanto o atual transcreve/renderiza), e avise em uma linha a cada link pronto.
+2. **`download.py "<URL>" --probe`.** Se o histórico já marcar a abertura dessa live como feita, diga e passe
+   para o próximo link. Twitch VOD: o `--probe` mostra os **capítulos** (categoria/jogo); o capítulo do jogo
+   marca quando ele abriu, então comece por ele.
+3. **Achar a abertura** (o ponto em que o jogo começa na tela: logo, primeira tela, primeira cena):
+   - Com capítulo do jogo: a abertura está no começo desse capítulo (confira nos frames).
+   - Sem capítulo (YouTube): baixe janelas de 20 min a partir do início (`--section 00:00:00-00:20:00`,
+     `00:20:00-00:40:00`…), transcreva com o tiny e olhe frames espalhados (`extract_frames.py` com candidatos a
+     cada 2 min) até ver o jogo na tela. Pare na primeira janela em que o jogo aparece.
+   - Live no ar em que o jogo ainda não apareceu em nada do que já passou: diga "ainda não abriu o jogo, me
+     manda de novo daqui a pouco" e passe para o próximo link. Não fique checando sozinho.
+4. **Trecho a cortar:** da abertura (A) até A + 30 min (`abertura.minutes_after` no config; live no ar: até
+   agora). Baixe esse trecho com `--section` (começando 1 min antes de A, para pegar a reação) num bloco só,
+   `work/<id>-abertura/`.
+5. **Cortes** (passos 2 a 6 normais, com as regras de "Início e fim perfeitos" e `check_cut.py`):
+   - **Short 1 = a abertura**: começa na reação ao abrir o jogo (não na espera do loading) e termina no fim da
+     reação. Gancho tipo "A REAÇÃO DELE ABRINDO O GTA 6". Música alta: corte mesmo assim, com o `aviso`.
+   - **Mais até `abertura.max_extra` (3) melhores momentos** desses 30 min, pelas regras de `viral-rules.md`.
+     É teto, não meta: se não tiver momento bom, entregue só a abertura.
+6. **Pasta, histórico e Notion** como sempre (passos 6a, 6b e 8): mesma pasta numerada e mesmo "Link N" se o
+   link já tiver sido mandado antes. `progress.py done` grava o trecho cortado, então se o usuário depois pedir
+   a live inteira, a abertura e esses 30 min não são repetidos (e não sai uma segunda abertura).
+7. No fim de cada link, diga em uma linha: os shorts (gancho e arquivo) e, se a live continua, "Me mande o link
+   de novo (sem "abertura") quando quiser o resto, que eu continuo de HH:MM:SS".
 
 ## Gameplay solo (lançamento do GTA 6, 19/11/2026) e calibração
 
