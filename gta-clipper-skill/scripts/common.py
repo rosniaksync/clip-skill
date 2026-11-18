@@ -119,9 +119,11 @@ def merge_spans(spans):
 
 
 def history_summary(hist):
-    """(trechos já cortados juntados, até onde está coberto desde o começo, nº de shorts)."""
+    """(trechos já cortados juntados, fim do último trecho cortado, nº de shorts).
+    A próxima rodada continua depois do último trecho cortado: no modo abertura (ex.: 0:40–1:10) o bate-papo antes
+    da abertura fica de fora e a live continua de ~1:05, não do começo."""
     spans = merge_spans([[b["start"], b["end"]] for b in hist.get("blocks", [])])
-    covered = spans[0][1] if spans and spans[0][0] <= 1 else 0.0
+    covered = spans[-1][1] if spans else 0.0
     return spans, covered, len(hist.get("clips", []))
 
 
