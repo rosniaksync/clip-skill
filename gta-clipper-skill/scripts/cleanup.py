@@ -4,7 +4,9 @@
 Roda sozinha quando o note liga (instale uma vez com scripts/install_cleanup.py).
 Apaga em paths.work_root tudo o que não foi mexido nas últimas cleanup.idle_hours horas:
 vídeos baixados, transcrições, frames, temporários e os shorts prontos. Mantém só cleanup.keep
-(a pasta historico/, com até onde cada vídeo/live foi cortado). Nunca mexe no Notion.
+(a pasta historico/, com até onde cada vídeo/live foi cortado). Também apaga as subpastas de
+paths.shorts_root (shorts\1, shorts\2...), mas não a pasta shorts em si (cleanup.shorts_subfolders).
+Nunca mexe no Notion.
 
 Uso:
   cleanup.py              # limpa (respeitando as horas sem mexer)
@@ -60,6 +62,25 @@ def safe_root(root):
     return r not in bad and not drive_root
 
 
+def prune_registro(sroot, gone):
+    """Tira do _registro.json as pastas apagadas. Sem nenhuma subpasta, apaga o registro (volta para a pasta 1)."""
+    reg_path = os.path.join(sroot, "_registro.json")
+    if not os.path.exists(reg_path):
+        return
+    if not any(os.path.isdir(os.path.join(sroot, n)) for n in os.listdir(sroot)):
+        os.remove(reg_path)
+        return
+    import json
+    with open(reg_path, encoding="utf-8") as f:
+        reg = json.load(f)
+    gone = set(gone)
+    reg["links"] = {k: v for k, v in reg.get("links", {}).items() if str(v) not in gone}
+    reg["arquivos"] = {k: v for k, v in reg.get("arquivos", {}).items()
+                       if v.replace("/", "\\").split("\\")[0] not in gone}
+    with open(reg_path, "w", encoding="utf-8") as f:
+        json.dump(reg, f, ensure_ascii=False, indent=2)
+
+
 def main():
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8")
@@ -97,6 +118,30 @@ def main():
             freed += sz
         except OSError as e:
             print(f"(não deu para apagar {p}: {e.__class__.__name__})")
+
+    # Subpastas de shorts_root (os shorts prontos de cada link). A pasta shorts em si fica.
+    if cc.get("shorts_subfolders", True):
+        sroot = cfg_path("shorts_root", cfg)
+        if sroot and os.path.isdir(sroot) and safe_root(sroot):
+            gone = []
+            for n in sorted(os.listdir(sroot)):
+                p = os.path.join(sroot, n)
+                if not os.path.isdir(p):
+                    continue
+                try:
+                    if now - last_touch(p) < limit:
+                        skipped.append(p)
+                        continue
+                    sz = size_of(p)
+                    if not a.dry_run:
+                        shutil.rmtree(p)
+                    removed.append(p)
+                    freed += sz
+                    gone.append(n)
+                except OSError as e:
+                    print(f"(não deu para apagar {p}: {e.__class__.__name__})")
+            if gone and not a.dry_run:
+                prune_registro(sroot, gone)
 
     verb = "Apagaria" if a.dry_run else "Apagado"
     for p in removed:

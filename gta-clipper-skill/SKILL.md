@@ -20,8 +20,9 @@ registra cada short no Notion.
 - **Caminhos** (`paths`): `work_root`, `cookies_master`, `pot_script` (gerador do PO token), `twitch_cli`,
   `setup_guide`. Variáveis de ambiente sobrescrevem: `YT_COOKIES_MASTER`, `BGUTIL_POT_SCRIPT`,
   `TWITCH_DOWNLOADER_CLI`, `CORTES_WORK_ROOT`.
-- **Duração do corte:** mínimo `clip_min_seconds` (20), ideal `clip_target_seconds` (25–45), sem máximo
-  (`clip_max_seconds` null). Sem enrolação no fim.
+- **Duração do corte: até 30 s (pedido do usuário em 18/11/2026, regra geral).** Mínimo `clip_min_seconds` (20),
+  ideal `clip_target_seconds` (20–30), máximo `clip_max_seconds` (30). Comece no gancho e corte toda preparação.
+  Passar de 30 s só em exceção rara, quando o desfecho não cabe. Sem enrolação no fim.
 - **Corte exato, pronto para postar:** `pad_before` / `pad_after` = 0. O short sai exatamente de `start` a `end`
   do `clips.json`, que você escolhe pelas regras de "Início e fim perfeitos" (`references/viral-rules.md`) e
   confere com `check_cut.py` (passo 4d). O "corte sugerido no arquivo" é o arquivo inteiro (ex.: 0:00 a 0:28).
@@ -51,8 +52,8 @@ registra cada short no Notion.
   maior `score` e renderize só esses. Achou os melhores, renderiza e encerra o bloco.
   Não guarde a resposta como padrão: no link seguinte, pergunte de novo (`ask_reels_each_link` no config).
 - **Bloco por bloco, sem esperar o usuário** (`auto_next_block`): termine o bloco 1 (passos 1 a 7), mostre a
-  lista do bloco e siga sozinho para o próximo, até o fim do vídeo. Enquanto um bloco transcreve ou renderiza,
-  baixe o próximo. Bloco sem momento bom entrega menos cortes. Avise em uma linha a cada bloco pronto.
+  lista do bloco e siga sozinho para o próximo, até o fim do vídeo. **Um bloco por vez, foco total (pedido do
+  usuário em 18/11/2026):** não baixe nem transcreva o próximo bloco enquanto o atual não terminar (passo 6b). Bloco sem momento bom entrega menos cortes. Avise em uma linha a cada bloco pronto.
   Cada bloco termina com `progress.py done` (passo 6b), para nada ser repetido depois.
 - **No máximo 2 jobs pesados ao mesmo tempo** (`max_parallel_jobs`: transcrição/render). Download pode rodar junto.
 - **Renderizar sempre vem primeiro.** Assim que um bloco tiver o `clips.json`, renderize na hora, mesmo que passe
@@ -73,6 +74,13 @@ registra cada short no Notion.
 
 ## Identidade visual (não mexer sem o usuário pedir)
 
+- **Estilo padrão = `cam` com 1/3 streamer (640) e 2/3 gameplay (1280) (pedido em 19/11/2026, todos os links). `faixa` só se pedir.** Antigo: **Estilo `faixa` (18/11/2026)** (`templates/faixa.json`): fundo neon roxo com palmeiras e
+  prédios e helicóptero (`assets/fundo_faixa.png`, tirado da arte do usuário "Thumbnail Neon da Live no GTA.png"
+  com `scripts/make_faixa_bg.py <arte.png>`; desenho próprio de palmeiras foi recusado, usar sempre a arte dele), no topo `—— logo / RSK CORTES ——`, gancho todo branco em itálico, **sem @canal** (pedido em 18/11/2026: nada de @ nem rosa no gancho), e a tela da
+  live inteira (com a webcam como ela aparece na live) numa faixa de 1080x608 no meio, **sem linhas/bordas
+  em volta**. Legenda palavra por palavra logo abaixo da faixa. Não precisa de caixa da webcam (`--cam`).
+  Gancho sem @ e sem palavra em rosa, ex.: `"ELE JUROU QUE A CASA TAVA PERFEITA KKKK"`. `cam`/`nocam` só se o usuário pedir.
+
 - **Logo oficial "RSK CORTES"** (`assets/logo.png`). No card entra redonda (`circle: true`) com margem preta
   (`pad` 0.18, tamanho 134), para a arte aparecer inteira.
 - **Fontes** (em `fonts/`): Montserrat Black (gancho, etiqueta, título do `nocam`) e Poppins ExtraBold
@@ -89,6 +97,9 @@ registra cada short no Notion.
 - **Etiqueta "RSK CORTES" na mesma cor do card:** fundo escuro em degradê (#14003A → #050008), borda neon em degradê
   (azul → roxo → rosa → laranja) e texto rosa neon (#FF4FD8), igual à caixa do card (`templates/cam.json`, `card.tag`).
 - **Nome do canal** (`channel_name`): **RSK CORTES**.
+- **Webcam em tela cheia (padrão, confirmado em 18/11/2026):** a webcam enche a área de cima (1080x768). O modo
+  moldura (`layout.cam_frame`, webcam menor no centro com fundo desfocado) existe no código, mas o usuário testou e
+  preferiu voltar ao original. Só ligue se ele pedir.
 - **Legenda do `cam`:** tamanho 69, palavra em destaque rosa (#FE5CCD), `gap` 30 px acima do card
   (`captions.anchor: "above_card"`). Nunca duas legendas ao mesmo tempo.
 - **Saída:** H.264 / yuv420p / 30 fps / AAC; o script confere cada arquivo e falha se não bater.
@@ -118,7 +129,7 @@ mesmo id, então mandar o link de novo continua de onde parou. Detalhes: `python
 - Nos dois casos, ao terminar o que já passou, diga em uma linha: "A live continua. Me mande o link de novo
   depois que eu continuo de HH:MM:SS, sem repetir" (o histórico guarda onde parou).
 
-**Três perguntas por link (vídeo ou live), em duas rodadas, logo depois do `--probe` e antes de baixar** (exceto no **modo abertura**, que não pergunta nada; ver a seção dele):
+**(19/11/2026: NÃO pergunte mais. Link = cortar tudo que ainda não foi cortado, sem blocos para o usuário; internamente em pedaços de ~30 min.)** Antigo: **Três perguntas por link (vídeo ou live), em duas rodadas, logo depois do `--probe` e antes de baixar** (exceto no **modo abertura**, que não pergunta nada; ver a seção dele):
 
 Rodada 1, sozinha (o tamanho dos blocos depende dela):
 1. **"Quanto tempo você quer que eu corte?"** Diga na pergunta quanto o vídeo/live tem e de onde começo, ex.:
@@ -154,7 +165,8 @@ comando exato para instalar o que faltar. Cookies e problemas do YouTube: `paths
 python scripts/download.py "<URL>" --out work/<id>-b<N> --section <início>-<fim do bloco N>
 ```
 Um `work/<id>-b<N>/` por bloco (vídeo de um bloco só: `work/<id>/`, sem `--section`).
-Gera `source.mp4` (até 1080p), `info.json`, e quando houver: `section.json`, `heatmap.json` (YouTube),
+Gera `source.mp4` (1080p; **sem 1080p, a resolução logo acima — 1440p, 2160p —, nunca abaixo**; só desce se o
+vídeo não tiver nada de 1080p para cima, e aí avise o usuário que a fonte é menor), `info.json`, e quando houver: `section.json`, `heatmap.json` (YouTube),
 `chat.json` (Twitch).
 - Com `--section` o corte é por cópia de stream e o arquivo começa no keyframe anterior. O script **mede o início
   real** (ffprobe) e grava em `section.json` o offset REAL. Chat da Twitch, heatmap e "horário no original" usam
@@ -224,7 +236,7 @@ Descarte o que não faz sentido sem contexto. Cada corte começa no gancho e ter
 [
   {
     "id": 1,
-    "style": "cam",
+    "style": "faixa",
     "start": "00:08:05.0",
     "end": "00:08:33.5",
     "hook": "EU TAVA NO FLOW STATE E PEGUEI TODAS AS BOLAS",
@@ -239,10 +251,12 @@ Descarte o que não faz sentido sem contexto. Cada corte começa no gancho e ter
 ```
 - `aviso` (opcional): alerta que sai no kit de postagem, ex.: "música do jogo alta: risco de som mudo".
 - `title`, `description` e `hashtags` são **obrigatórios** em todo corte (vão para o kit; título e hashtags também para o Notion).
-- `style`: `"cam"` (com webcam) ou `"nocam"`. `hook` = a frase do card, UMA frase só (até ~8 palavras, sem emoji,
+- `style`: `"faixa"` (padrão), ou `"cam"` (com webcam) / `"nocam"` se o usuário pedir. `hook` = a frase do card, UMA frase só (até ~8 palavras, sem emoji,
   em português); o script quebra em 2 linhas sozinho. Não use `subhook`. `title`, `description`, `hashtags` vão para o kit de postagem.
 - `type`: Reação, Fail, Jogada, Piada, História ou Discussão (fica no `renders.json`; o Notion não usa mais).
 - `start`/`end` = o corte exato do arquivo (com 2 casas decimais, ex.: `00:08:14.73`), conferido no passo 4d.
+- **Legenda = só a voz do streamer.** Fala do jogo (NPC, cutscene, rádio, ligação) não entra na legenda nem é traduzida: marque esses trechos em `"caption_mute": [["00:08:28.9","00:08:58.9"]]` (tempo do arquivo). O whisper transcreve/traduz o áudio do jogo; leia o texto e confira nos frames quem está falando.
+- **Grito/risada sem legenda** (a transcrição pula): `"captions_add": [{"s":"00:37:30.2","e":"00:37:33.4","w":"AAAAAAAAA"}]` (tempo do arquivo; ache pelo volume e pela webcam).
 - Opcionais: `"folga": true` (só se o usuário pedir), `"captions": false`, `"cam": [x,y,w,h]`, `"captions_pt"` (passo 4c), `"notion_page_id"` (passo 8).
 
 ## Passo 4d — Conferir início e fim de cada corte (antes de renderizar, sempre)
@@ -266,7 +280,8 @@ da regra, fim no pico do som, transição no começo ou no fim).
 ## Passo 4b — Ver o vídeo e escolher o estilo
 
 `python scripts/make_shorts.py work/<id> --snapshot` → `snapshot.jpg` (6 quadros). Olhe e decida:
-1. **Tem webcam?** Sim → `cam`; estime o retângulo em frações `x,y,w,h` e confira com
+0. Estilo `faixa` (padrão): não precisa achar a webcam; só confira a legenda gravada (item 2).
+1. **Tem webcam?** (só para `cam`/`nocam`) Sim → `cam`; estime o retângulo em frações `x,y,w,h` e confira com
    `make_shorts.py work/<id> --cam x,y,w,h --snapshot` (caixa vermelha dentro da webcam, sem barras de
    overlay). Fica salvo em `setup.json`. Não → `nocam`.
 2. **Legenda gravada na imagem?** Sim → `--burned-subs` (sem legenda palavra por palavra).
@@ -288,6 +303,8 @@ das palavras dentro do tempo da frase.
 
 `python scripts/make_shorts.py work/<id> [--only 1,2]`
 
+- **`faixa`:** fundo + topo + gancho numa imagem só; a tela da live inteira em y=702 (1080x608), sem bordas;
+  legenda em y=1440.
 - **`cam`:** topo 768 px = webcam; baixo 1152 px = gameplay; card centrado na divisão (y=768) o vídeo todo;
   legenda acima do card.
 - **`nocam`** (layout `stack` em `nocam.json`): fundo desfocado, logo RSK redonda com anel rosa→laranja no topo,
@@ -315,7 +332,7 @@ o primeiro link que o usuário mandou é a pasta `1`, o segundo é a `2`, e assi
 mesmo link vão para a mesma pasta** (mandar o mesmo link de novo continua nela). Cada arquivo sai como
 `NN_GANCHO DO SHORT.mp4` (NN continua de bloco em bloco) e a pasta ganha um `lista-de-postagem.md` (título,
 descrição, hashtags e horário no original). O registro de qual link é qual número fica em
-`shorts\_registro.json` (não mexer). A pasta fica **fora** de `work/`, então a limpeza do dia nunca apaga.
+`shorts\_registro.json` (não mexer). A limpeza do dia apaga as subpastas (`shorts\1`, `shorts\2`...) e o registro, mas não a pasta `shorts`; a numeração volta para 1.
 Avise o usuário em qual pasta numerada os shorts ficaram. No Notion, o campo `Arquivo` usa `final_file` do
 `renders.json` (caminho dentro de `shorts\<número>\`).
 
@@ -356,19 +373,21 @@ Os dados de cada short estão em `shorts/renders.json`. Base de progresso: `prog
 ("Progresso dos Vídeos").
 
 Para cada short renderizado:
-1. **Linha em "Resultados dos Cortes"** (só o que o usuário precisa para postar: Gancho, Título, Hashtags e Arquivo, mais o Link para separar;
-   aprovado em 17/11/2026):
+1. **Linha em "Resultados dos Cortes"** (só o que o usuário precisa para postar: Gancho, Título e hashtags, Arquivo, mais o Link para separar;
+   aprovado em 17/11/2026; título e hashtags juntos numa coluna só desde 18/11/2026):
    - `Gancho` (título): **um texto só**, sem barra: `hook_text` do `renders.json` (ex.: "EXPLODIU TUDO NA CARA
      DA POLÍCIA")
-   - `Título`, `Hashtags`: os mesmos do kit de postagem (`title`, `hashtags` separadas por espaço). Sempre
-     preencha os dois. A descrição fica só no kit (não vai para o Notion).
+   - `Título e hashtags` (uma coluna só, pronta para copiar e colar): `title` do kit + espaço + `hashtags`
+     separadas por espaço. Se o título já termina com uma hashtag que está na lista (ex.: `#alanzoka`), tire do
+     fim do título para não repetir. Ex.: `Ele abriu o GTA 6 e o som sumiu na hora 😭 #bisteconee #gta6 #gtavi
+     #shorts #cortes #fail`. Sempre preencha. A descrição fica só no kit (não vai para o Notion).
    - `Arquivo`: caminho final do .mp4 na pasta numerada (`final_file` do `renders.json`, depois do passo 6a)
    - `Link` (seleção): `"N · <título do vídeo>"`, com N = número da pasta desse link
      (`shorts\_registro.json` → `links`, o mesmo de `C:\cortes\shorts\N`) e o título do `info.json`, ex.:
      `"1 · iShowSpeed Plays I Wanna Test This Game.."`. Todos os blocos do mesmo link usam a mesma opção. Link
      novo: crie a opção (`ALTER COLUMN "Link"` listando as opções antigas + a nova, cor diferente da anterior).
      A visão "Por link" agrupa a tabela por esse campo, um bloco por link.
-   Só esses 5 campos: não crie outros nesta base. Grave o id da página criada no corte (`"notion_page_id"` no
+   Só esses 4 campos: não crie outros nesta base. Grave o id da página criada no corte (`"notion_page_id"` no
    `clips.json`). Se o corte já tiver `notion_page_id` (gancho trocado, tempo ajustado), **atualize essa linha**
    (`Gancho`, `Arquivo` e o que mais mudou), não crie outra.
 2. **Base de canais** ("Canais para Cortes", opcional): se existir e não estiver na lixeira, procure o canal
@@ -400,12 +419,25 @@ shorts com views, `notion.min_rows_for_patterns`).
 Instalada uma vez com `python scripts/install_cleanup.py` (atalho escondido na pasta Inicializar do Windows,
 sem admin; `--remove` desinstala). Toda vez que o usuário entra no Windows, `scripts/cleanup.py` apaga em
 `paths.work_root` tudo o que não foi mexido nas últimas `cleanup.idle_hours` (3) horas: vídeos baixados,
-transcrições, frames, temporários **e os shorts prontos**. Fica só `historico/` (de onde cada vídeo/live parou).
-O Notion não é mexido. Por isso:
+transcrições, frames, temporários **e os shorts prontos**, e também as subpastas de `paths.shorts_root`
+(`shorts\1`, `shorts\2`..., com o `_registro.json`; a pasta `shorts` fica; `cleanup.shorts_subfolders`).
+Fica só `historico/` (de onde cada vídeo/live parou).
+O Notion não é mexido (o usuário diz o que apagar lá, quando quiser). Por isso:
 - No fim de cada bloco, avise: "os shorts ficam na pasta até você desligar; amanhã, ao ligar, são apagados".
 - No dia seguinte, o mesmo link continua de onde parou (pelo histórico), sem repetir.
 - Trocar gancho de um short do dia anterior não dá mais (os arquivos foram apagados): é preciso cortar de novo.
 - Teste sem apagar: `python scripts/cleanup.py --dry-run`. Registro das limpezas: `historico/limpeza.log`.
+
+## Modo trechos (link + horários que o usuário quer)
+
+Quando o usuário manda o link junto com horários (ex.: "1:23:40", "1:23:40-1:24:10", "2:05:00 grito"),
+**não pergunte nada** (nem tempo, blocos ou reels) e corte só esses momentos:
+- Horário solto = o momento está ali: baixe de 1 min antes a 1 min depois (`--analysis`), transcreva, olhe os
+  frames e ache o gancho e o desfecho em volta dele. Faixa "A-B" = o corte fica dentro dela (pode apertar).
+- Cada corte até 30 s (regra geral), começando no gancho. Texto que vier junto (ex.: "grito", um gancho) vale
+  como dica ou como o próprio gancho.
+- Live no ar: só dá para cortar o que já passou; horário no futuro → avise e espere.
+- Resto igual: fetch_hd, make_shorts, organize, `progress.py done`, Notion com "O que acontece" e 2 outros ganchos.
 
 ## Modo abertura (lançamento do jogo: "abertura" + link)
 

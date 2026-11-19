@@ -1,20 +1,20 @@
 {
   "name": "cam",
-  "description": "Neon synthwave RSK CORTES (logo oficial, tons de sol: azul, roxo, rosa, coral). Backup: cam_gta6_loucuras.json",
+  "description": "Neon synthwave RSK CORTES (logo oficial, tons de sol: azul, roxo, rosa, coral). Backup: cam_gta6_loucuras.json | 18/11/2026: 1/3 streamer (640) e 2/3 gameplay (1280), pedido do usuário",
   "canvas": {
     "w": 1080,
     "h": 1920
   },
   "channel_name": "RSK CORTES",
   "layout": {
-    "cam_height": 768,
-    "game_height": 1152,
+    "cam_height": 640,
+    "game_height": 1280,
     "game_focus_x": 0.5,
     "scale_flags": "lanczos",
     "cam_sharpen": "unsharp=5:5:0.7:3:3:0.0"
   },
   "card": {
-    "anchor_y": 768,
+    "anchor_y": 640,
     "max_width": 1000,
     "uppercase": true,
     "tag": {
@@ -70,7 +70,9 @@
       "glow": {
         "radius": 9,
         "opacity": 0.8
-      }
+      },
+      "fixed_w": 1000,
+      "fixed_h": 168
     },
     "line1": {
       "font": {

@@ -32,6 +32,11 @@ Use estas regras para ranquear os candidatos. Um corte precisa de pelo menos 2 d
 5. História com desfecho: começo, virada e final engraçado em até ~45 segundos.
 6. Frase marcante: algo que as pessoas vão citar ou discutir nos comentários.
 
+**Novidades do jogo também valem (pedido do usuário em 18/11/2026):** loja, academia, barbearia, celular/apps,
+gráfico, física, detalhe que ninguém viu, mecânica nova, NPC fazendo algo realista. Basta o streamer mostrar e
+reagir um pouco surpreso ("olha isso", "que detalhe", "não acredito que dá pra..."). Esse tipo é o mais
+buscado no lançamento: gente que não tem o jogo quer ver "como é X no GTA 6".
+
 ## Gancho (os 2 primeiros segundos decidem tudo)
 
 - O corte começa no gancho (ver "Início e fim perfeitos" abaixo). O arquivo é o corte exato, postado sem
@@ -40,6 +45,17 @@ Use estas regras para ranquear os candidatos. Um corte precisa de pelo menos 2 d
   máximo possível da preparação.
 - O texto do gancho cria curiosidade, não descreve: "ELE NÃO ESPERAVA ISSO" é melhor que
   "Momento engraçado no GTA". Sem emoji no card. No máximo ~5 palavras por linha.
+- **Nada de gancho genérico** ("ELE NÃO QUERIA PROBLEMA", "ESSE GTA É CINEMA"). Use o detalhe concreto e
+  estranho do corte, o que faz a pessoa pensar "como assim?". Fórmulas que funcionam:
+  - pergunta de quem não tem o jogo: "COMO É A ACADEMIA NO GTA 6 ????", "DÁ PRA CORTAR O CABELO NO GTA 6 ????"
+  - detalhe surpreendente: "O GTA 6 TEM ISSO E NINGUÉM PERCEBEU", "ATÉ A CAIXA DE PAPELÃO SE MEXE NO GTA 6"
+  - promessa x resultado: "ELE JUROU QUE IA ANDAR NA MORAL… DUROU 10 SEGUNDOS"
+  - número/absurdo específico: "PULOU DE TRAILER DE UMA PONTE QUEBRADA COM 5 MIL NO BOLSO"
+  - a frase dele entre aspas, quando é forte: "\"OS CARAS TÃO DE COLETE, VIADO\""
+- **Sempre 3 opções de gancho por corte**: a melhor vai no vídeo (`hook`), as outras 2 em `hook_alt`
+  (lista). No Notion vão em "Outros ganchos" junto com "O que acontece" (1 frase do que se vê no vídeo), para o
+  usuário trocar o gancho sem ter que assistir. Ele responde "07 → 2" e eu renderizo de novo só esse short
+  (`make_shorts.py --only N`) e troco o arquivo.
 
 ## Duração e final
 

@@ -78,8 +78,12 @@ def main():
                 continue
             src_abs = os.path.abspath(src)
             if src_abs in reg["arquivos"]:
-                print(f"  = {os.path.basename(src)}: já organizado como {reg['arquivos'][src_abs]}")
-                continue
+                old_dst = os.path.join(root, reg["arquivos"][src_abs])
+                # pasta de trabalho reaproveitada: o short_NN novo tem o mesmo caminho mas é outro vídeo
+                if not os.path.isfile(old_dst) or os.path.getsize(old_dst) == os.path.getsize(src):
+                    print(f"  = {os.path.basename(src)}: já organizado como {reg['arquivos'][src_abs]}")
+                    continue
+                print(f"  ! {os.path.basename(src)}: mesmo caminho de {reg['arquivos'][src_abs]}, mas é outro short")
             seq += 1
             hook = r.get("hook_text") or " ".join(x for x in (r.get("hook", ""), r.get("subhook", "")) if x)
             name = f"{seq:02d}_{safe_name(hook)}.mp4"
@@ -103,7 +107,8 @@ def main():
                     f.write(f"\n## {name}\n")
                     f.write(f"- Título: {r.get('title', '')}\n")
                     f.write(f"- Descrição: {r.get('description', '')}\n")
-                    f.write(f"- Hashtags: {' '.join(r.get('hashtags') or [])}\n")
+                    tags = r.get("hashtags") or []
+                    f.write(f"- Hashtags: {tags if isinstance(tags, str) else ' '.join(tags)}\n")
                     f.write(f"- No original: {r.get('original_time', '')}\n")
             write_json(os.path.join(wd, "shorts", "renders.json"), renders)
 

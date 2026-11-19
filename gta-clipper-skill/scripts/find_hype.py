@@ -9,9 +9,10 @@ Sinais (cada um em z-score, depois somados com os pesos de config.json -> hype.w
   - fala: ritmo + palavras de empolgação = reforço fraco
   Texto normalizado antes (minúsculo, sem acento, letras repetidas reduzidas).
 
-Uso: find_hype.py work/<id> [--window 30] [--top 25]
+Uso: find_hype.py work/<id> [--window 30] [--top 12] [--quiet]
      find_hype.py work/<id> --words 00:08:05-00:08:35   # palavras mais frequentes (tempo do arquivo)
-Grava hype.json e mostra as melhores janelas com trecho da transcrição.
+Grava hype.json e mostra as melhores janelas (uma linha cada; --quiet só grava). O read_blocks.py marca o pico
+de cada janela na leitura (◆N), então normalmente não precisa ler esta lista.
 """
 import argparse
 import json
@@ -182,10 +183,13 @@ def top_words(workdir, rng, cfg, n=15):
 
 
 def main():
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")
     ap = argparse.ArgumentParser()
     ap.add_argument("workdir")
     ap.add_argument("--window", type=int, default=30)
-    ap.add_argument("--top", type=int, default=25)
+    ap.add_argument("--top", type=int, default=12)
+    ap.add_argument("--quiet", action="store_true", help="só grava hype.json (uma linha de resumo)")
     ap.add_argument("--words", help="most frequent words (chat + speech) in S-E, e.g. 00:08:05-00:08:35")
     a = ap.parse_args()
     cfg = load_hype_cfg()
@@ -199,7 +203,6 @@ def main():
     has_tr = bool(tr["words"])
     offset = section_offset(a.workdir)
 
-    print("Medindo o volume do áudio…")
     db = audio_db_per_sec(video)
     n = len(db)
     if n < a.window:
@@ -250,7 +253,6 @@ def main():
     # gameplay gate: drop windows with a (nearly) static picture (menus, loading, idle screens)
     gate_p = cfg.get("motion_gate_percentile", 0)
     if gate_p:
-        print("Medindo o movimento da imagem…")
         mot = motion_per_sec(video, n)
         wm = window_sum(mot, W) / W
         thr = np.percentile(wm, gate_p)
@@ -278,12 +280,11 @@ def main():
 
     json.dump({"signals": signals, "window": W, "candidates": results},
               open(os.path.join(a.workdir, "hype.json"), "w", encoding="utf-8"), indent=1, ensure_ascii=False)
-    print(f"Sinais usados: {', '.join(signals)}\n")
-    for r in results:
-        print(f"#{r['rank']:>2}  {r['start_ts']}–{r['end_ts']}  pico {r['peak_ts']}  nota {r['score']}")
-        if r["text"]:
-            print(f"     {r['text'][:180]}")
-    print(f"\n✓ {len(results)} janelas → hype.json (apoio: confira contra a sua leitura dos blocos)")
+    if not a.quiet:
+        for r in results:
+            print(f"#{r['rank']:>2} {r['start_ts']}–{r['end_ts']} pico {r['peak_ts']} nota {r['score']}"
+                  + (f" | {r['text'][:100]}" if r["text"] else ""))
+    print(f"✓ {len(results)} janelas → hype.json (sinais: {', '.join(signals)}; apoio, não filtro)")
 
 
 if __name__ == "__main__":

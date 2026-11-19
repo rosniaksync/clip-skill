@@ -21,7 +21,7 @@ Cole o link de uma live ou VOD (YouTube, Twitch, Kick...) e o Claude:
 de novo (por exemplo, a live que ainda estava rolando) continua de onde parou, sem repetir shorts.
 
 **Limpeza do dia:** ao ligar o note, a skill apaga sozinha os vídeos baixados, os temporários e os shorts do dia
-anterior. Fica só o histórico de onde parou (instale uma vez com `python scripts/install_cleanup.py`).
+anterior (inclusive as subpastas de `C:\cortes\shorts`; a pasta em si fica). Fica só o histórico de onde parou (instale uma vez com `python scripts/install_cleanup.py`).
 
 Para trocar o gancho: "corte N: GANCHO / SUBGANCHO" (renderiza só aquele e atualiza a mesma linha do Notion).
 
