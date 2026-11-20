@@ -63,7 +63,9 @@ def main():
     fcfg = load_config().get("frames", {})
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("workdir")
-    ap.add_argument("--candidates", required=True)
+    ap.add_argument("--candidates", help="cands.json (frames só desses trechos)")
+    ap.add_argument("--scan", type=float, metavar="SEG",
+                    help="varre o bloco INTEIRO: 1 quadro a cada SEG s (ex.: 10), linhas de 2 min, folhas scan_N.jpg")
     ap.add_argument("--frames", type=int, default=int(fcfg.get("per_candidate", 4)))
     ap.add_argument("--width", type=int, default=int(fcfg.get("width", 320)))
     ap.add_argument("--per-sheet", type=int, default=int(fcfg.get("per_sheet", 5)))
@@ -74,7 +76,18 @@ def main():
     src = a.source or os.path.join(a.workdir, "source.mp4")
     out = os.path.join(a.workdir, "frames")
     os.makedirs(out, exist_ok=True)
-    cands = json.load(open(a.candidates, encoding="utf-8"))
+    prefix = "cands"
+    if a.scan:
+        from common import media_duration
+        dur, win = media_duration(src), 120.0
+        cands = [{"id": k + 1, "start": k * win, "end": min(dur, (k + 1) * win)} for k in range(int(dur // win) + 1)
+                 if k * win < dur - 1]
+        a.frames, prefix = max(1, int(round(win / a.scan))), "scan"
+        a.width = min(a.width, 240)
+    elif a.candidates:
+        cands = json.load(open(a.candidates, encoding="utf-8"))
+    else:
+        sys.exit("Use --candidates cands.json ou --scan 10")
     keep = {int(x) for x in a.ids.split(",")} if a.ids else None
 
     jobs, rows = [], []
@@ -83,9 +96,10 @@ def main():
         if keep is not None and int(cid) not in keep:
             continue
         s, e = secs(c["start"]), secs(c["end"])
-        step = (e - s) / a.frames
+        step = (e - s) / a.frames if not a.scan else a.scan
         times = [s + step * (n + .5) for n in range(a.frames)]
-        files = [os.path.join(out, f"cand{cid}_{n + 1}.jpg") for n in range(a.frames)]
+        times = [t for t in times if t < e]
+        files = [os.path.join(out, f"{prefix}{cid}_{n + 1}.jpg") for n in range(len(times))]
         jobs += list(zip(times, files))
         rows.append((f"#{cid}  {fmt_hms(s)}–{fmt_hms(e)}", [(f, fmt_hms(t)) for f, t in zip(files, times)]))
     if not rows:
@@ -95,7 +109,7 @@ def main():
 
     sheets = []
     for k in range(0, len(rows), a.per_sheet):
-        sheets.append(sheet(rows[k:k + a.per_sheet], os.path.join(out, f"cands_{k // a.per_sheet + 1}.jpg"), a.width))
+        sheets.append(sheet(rows[k:k + a.per_sheet], os.path.join(out, f"{prefix}_{k // a.per_sheet + 1}.jpg"), a.width))
     if a.per_candidate:
         for title, fr in rows:
             cid = title.split()[0][1:]

@@ -274,7 +274,7 @@ def main():
     with ThreadPoolExecutor(max_workers=1 if a.verbose else min(4, len(todo))) as ex:
         res = list(ex.map(lambda c: check_clip(c, tr, audio, src, a.verbose), todo))
 
-    min_len = float(cfg.get("clip_min_seconds", 20))
+    min_len = float(cfg.get("clip_min_seconds") or 0)   # null = sem mínimo
     changed = 0
     for r in res:
         ds, de = r["ns"] - r["s"], r["ne"] - r["e"]
@@ -284,7 +284,7 @@ def main():
         print(f"  fim {'ok' if abs(de) < 0.01 else f'{de:+.2f} s'}: {r['ctx_e']}")
         for n in r["notes"]:
             print(f"  · {n}")
-        if dur < min_len:
+        if min_len and dur < min_len:
             r["alerts"].append(f"corte com {dur:.1f} s (mínimo {min_len:g} s)")
         for al in r["alerts"]:
             print(f"  ⚠ {al}")

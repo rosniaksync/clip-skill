@@ -2,18 +2,18 @@
     "paths": {
         "_note": "Caminhos deste PC. Variáveis de ambiente sobrescrevem: YT_COOKIES_MASTER, BGUTIL_POT_SCRIPT, TWITCH_DOWNLOADER_CLI, CORTES_WORK_ROOT. '~' = pasta do usuário; caminho relativo = relativo à pasta da skill.",
         "work_root": "C:\\cortes\\work",
-        "shorts_root": "C:\\cortes\\shorts\\madruga",
+        "shorts_root": "C:\\cortes\\shorts",
         "cookies_master": "C:\\cortes\\cookies-master.txt",
         "pot_script": "~/bgutil-ytdlp-pot-provider/server/build/generate_once.js",
         "twitch_cli": "tools/TwitchDownloaderCLI/TwitchDownloaderCLI",
         "setup_guide": "C:\\cortes\\COMO-USAR.md"
     },
-    "clip_min_seconds": 20,
+    "clip_min_seconds": null,
     "clip_target_seconds": [
-        20,
-        30
+        25,
+        45
     ],
-    "clip_max_seconds": 30,
+    "clip_max_seconds": null,
     "pre_roll_seconds": 15,
     "pad_before": 0,
     "pad_after": 0,
@@ -43,8 +43,12 @@
         "analysis_height": 480,
         "hd_margin_seconds": 5,
         "_fast_note": "fast_mode: bloco baixado leve (download.py --analysis, analysis_height) só para analisar; depois do check_cut, fetch_hd.py baixa cada corte em alta (regra 1080p/acima) com hd_margin_seconds de sobra e confere o tempo pelo áudio. O make_shorts usa o trecho em alta (hd/hd.json).",
-        "best_height": 2160,
-        "_best_note": "Baixa a MAIOR resolução entre 1080p e best_height (2160 = 4K) que o vídeo tiver; só os trechos dos cortes vêm em alta, então o custo é pequeno. 0 = volta a preferir 1080p."
+        "best_height": 0,
+        "_best_note": "0 = 1080p (o short sai em 1080p; 4K deixava o render muito lento). Sem 1080p, a próxima acima.",
+        "live_fast": true,
+        "live_threads": 16,
+        "live_fragment_retries": 6,
+        "_live_note": "Live do YouTube no ar: download.py pede os pedaços de ~1 s direto, live_threads ao mesmo tempo (yt-dlp live_from_start pede 1 por vez, ~1 s cada). Se o YouTube frear (403/429), baixe live_threads para 8. Pedaço que falha é pedido de novo; se continuar faltando, para com erro."
     },
     "language_detect": {
         "model": "tiny",
@@ -56,9 +60,9 @@
         "_note": "3 a 5 trechos de ~30 s espalhados pelo meio do vídeo (pula skip_edges do começo e do fim); vence o idioma que mais aparece. Resultado em work/<id>/lang.json."
     },
     "transcribe_fast": {
-        "model": "tiny",
+        "model": "small",
         "beam": 1,
-        "note": "passada completa só para ler e achar candidatos; se errar muito, suba para base"
+        "note": "small no bloco todo (19/11/2026): o tiny saiu ilegível em live; ~2,4 min por 30 min de live. Não precisa mais retranscrever candidatos."
     },
     "transcribe_refine": {
         "model": "small",

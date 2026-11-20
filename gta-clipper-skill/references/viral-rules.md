@@ -1,18 +1,68 @@
 # O que faz um momento de live virar um bom short
 
-Use estas regras para ranquear os candidatos. Um corte precisa de pelo menos 2 delas para valer a pena.
+## Prioridades do canal (dados reais, nov/2026) — valem antes de tudo
 
-## Como achar os candidatos (processo)
+a) **GTA 6 como novidade:** descobertas e segredos, primeiras vezes, opinião ou nota do streamer sobre o jogo,
+   visuais impressionantes (noite, chuva, cidade, pôr do sol, gráfico). **Valem com áudio calmo**: não precisam
+   de grito, pico nem chat explodindo.
+b) **O que o corte promete tem que APARECER na tela nos primeiros segundos.** Só falado, lido ou mostrado num
+   celular do jogo = descartar.
+c) **Referência conhecida do público brasileiro** (Pé Grande sim, "macaco gambá" não), a não ser que o vídeo
+   explique e mostre sozinho.
+d) **Rebaixar zoeira, roleplay e situação que depende de contexto**, a não ser que o desfecho seja muito forte e
+   se entenda sozinho.
+e) Revisar quando o GTA 6 deixar de ser lançamento (~mar/2027).
 
-1. Transcreva o bloco inteiro com o modelo rápido (`tiny`) e leia TUDO em blocos de 10 minutos
-   (`read_blocks.py`), não só em volta dos picos. Piadas e histórias boas costumam ser contadas com calma.
-2. Durante a leitura, procure: piadas, reviravoltas, discussões, situações inesperadas, histórias engraçadas
-   com desfecho e reações fortes.
-3. Extraia os frames de cada candidato (`extract_frames.py`) e olhe as imagens: alguns dos melhores momentos
-   são visuais e sem fala (batida, fuga, cena absurda, susto).
-4. Retranscreva só os candidatos com o `small` e então escolha os cortes finais.
-5. Os sinais do `find_hype.py` (áudio, chat da Twitch, "clipa", mapa de mais repetidos do YouTube, movimento)
-   são apoio. Nunca decidem sozinhos. Pico alto sem graça na leitura é descartado; história boa sem pico fica.
+| Short | Resultado | Por quê |
+|---|---|---|
+| "Tem Pé Grande no GTA 6 e ele te nocauteia" | um dos melhores | segredo, criatura que todo mundo conhece, aparece e o nocaute se vê |
+| "A primeira vez vendo Vice City à noite" | um dos melhores | primeira vez + visual impressionante, áudio calmo |
+| "A nota dele pro GTA 6 depois de jogar" | um dos melhores (1850 views) | opinião/nota: o que quem não jogou quer saber |
+| "Ele treinou no GTA 6 e o jogo pediu proteína" | ruim (~45–58) | zoeira de detalhe pequeno; a graça é o comentário |
+| "O que levar pra uma mulher saindo da cadeia" | ruim (58) | roleplay de contexto, sem novidade nem payoff visual |
+| "O GTA 6 tem a lenda do macaco gambá" | ruim (45) | só um post no celular, referência desconhecida |
+
+## O teste do corte bom (precisa passar nos 3)
+
+1. **Quem não tem o jogo entende só pela imagem nos primeiros 3 s** (sem som também).
+2. **A coisa prometida aparece** (a criatura, a cidade, a mecânica, a nota), não é só dita.
+3. **Responde "como é X no GTA 6?"** com X que o brasileiro conhece, **ou** é reação/opinião forte do streamer
+   que se entende sozinha.
+
+## O que viraliza (procure ativamente, em toda live)
+
+- **"Dá pra fazer X no GTA 6?"**: coisas da vida real no jogo (academia, salão, tatuagem, comida, celular, apps,
+  rede social, cachorro/animal, casa, comprar roupa, posto, banco, cassino, praia, mergulho, avião, barco).
+- **Realismo/física absurda:** NPC reagindo de um jeito realista, polícia que reconhece, carro amassando, água,
+  chuva, ragdoll, tiro que muda tudo, detalhe pequeno que impressiona ("até X se mexe").
+- **Segredos e easter eggs:** criaturas, lendas, referências a GTA antigos (CJ, Vice City 2002, Tommy), lugares
+  escondidos, mensagens escondidas.
+- **Visual de tirar o fôlego:** pôr do sol, noite com neon, tempestade/furacão, vista da cidade do alto, fundo do mar.
+- **Primeiras vezes:** primeira vez dirigindo, na praia, à noite, numa missão famosa, vendo um lugar novo.
+- **Opinião/nota/comparação:** "melhor que o GTA 5?", nota, "o que achou", crítica forte, "isso aqui é bug?".
+- **Bug e glitch engraçado** que se vê (NPC voando, carro preso, personagem travado).
+- **Caos com desfecho:** fuga da polícia que dá certo/errado no último segundo, explosão, perseguição, morte
+  ridícula — reação forte do streamer junto.
+- **Reação emocional de verdade:** susto, grito, risada que não para, choque com a novidade.
+- **Número/absurdo concreto:** "gastou 400 mil em 2 minutos", "5 estrelas em 10 segundos".
+
+## Variedade: cortes de coisas DIFERENTES (pedido do usuário, 19/11/2026)
+
+- **No máximo 1 corte por assunto por link** (ex.: um de polícia, um de mapa, um de salão — nunca dois de "mapa"
+  ou dois de "fuga"). Dois momentos do mesmo assunto: fica o melhor.
+- Num link, misture tipos: descoberta/mecânica, visual, reação/caos, opinião, primeira vez. Antes de fechar o
+  bloco, confira a lista: se dois cortes contam a mesma coisa, troque um por outro assunto que passe no teste.
+- Confira também os shorts já feitos do mesmo link (`progress.py check` e o histórico): não repita assunto entre
+  blocos. Menu/tela de mapa como payoff é fraco: só entra se for a única forma de mostrar a mecânica.
+
+## Eliminatório (descartar sem pensar duas vezes)
+
+- Graça que depende do comentário em cima de um detalhe pequeno.
+- Roleplay ou contexto de antes na live.
+- Referência desconhecida ou só mostrada em celular/texto.
+- Bate-papo só com a webcam (sem jogo), menu/AFK/loading (exceto a abertura do jogo).
+- Música com direitos autorais alta (exceto a abertura, com aviso).
+- Dado pessoal na tela.
 
 ## Abertura do jogo (lançamento do GTA 6 e outros lançamentos)
 
@@ -24,6 +74,8 @@ Use estas regras para ranquear os candidatos. Um corte precisa de pelo menos 2 d
 - **No máximo um short de abertura por live.**
 
 ## Tipos de momento que funcionam (do melhor para o pior)
+
+As Prioridades do canal, o teste e a Variedade (acima) vêm antes desta ordem.
 
 1. Reação emocional forte: grito, risada que não para, raiva, choque. Pico de áudio com a voz do streamer.
 2. Jogada absurda: fuga no último segundo, manobra impossível, timing perfeito. O chat costuma explodir.
@@ -59,7 +111,7 @@ buscado no lançamento: gente que não tem o jogo quer ver "como é X no GTA 6".
 
 ## Duração e final
 
-- A partir de 20 segundos, sem máximo fixo (ver `config.json`). Abaixo de 30 segundos tende a ser
+- Sem mínimo e sem máximo fixo (ver `config.json`). Abaixo de 30 segundos tende a ser
   reassistido mais; passe de 59 segundos só quando a história pede. Nunca encha linguiça.
 - Termine no desfecho ou na reação (ver "Início e fim perfeitos" abaixo).
 

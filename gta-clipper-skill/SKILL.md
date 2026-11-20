@@ -5,8 +5,8 @@ description: Transforma qualquer live ou vídeo longo (YouTube, Twitch VOD, Kick
 
 # Live → Shorts virais
 
-O usuário cola o link de uma live. Você baixa, detecta o idioma, transcreve (tiny no vídeo todo), lê tudo em
-blocos de 10 min, olha os frames, retranscreve os candidatos com o small, escolhe os cortes, renderiza cada um
+O usuário cola o link de uma live. Você baixa, detecta o idioma, transcreve (small),
+lê tudo e varre o bloco em imagens, escolhe cortes de assuntos diferentes, renderiza cada um
 como short 1080x1920 (card de gancho, legenda palavra por palavra, começando e terminando no ponto exato) e
 registra cada short no Notion.
 
@@ -20,9 +20,9 @@ registra cada short no Notion.
 - **Caminhos** (`paths`): `work_root`, `cookies_master`, `pot_script` (gerador do PO token), `twitch_cli`,
   `setup_guide`. Variáveis de ambiente sobrescrevem: `YT_COOKIES_MASTER`, `BGUTIL_POT_SCRIPT`,
   `TWITCH_DOWNLOADER_CLI`, `CORTES_WORK_ROOT`.
-- **Duração do corte: até 30 s (pedido do usuário em 18/11/2026, regra geral).** Mínimo `clip_min_seconds` (20),
-  ideal `clip_target_seconds` (20–30), máximo `clip_max_seconds` (30). Comece no gancho e corte toda preparação.
-  Passar de 30 s só em exceção rara, quando o desfecho não cabe. Sem enrolação no fim.
+- **Duração do corte: sem mínimo e sem máximo (pedido do usuário em 19/11/2026, substitui a regra de 18/11).**
+  `clip_min_seconds` e `clip_max_seconds` = null; `clip_target_seconds` (25–45) é só referência: o corte tem o
+  tamanho que a história pede. Comece no gancho e corte toda preparação. Sem enrolação no fim.
 - **Corte exato, pronto para postar:** `pad_before` / `pad_after` = 0. O short sai exatamente de `start` a `end`
   do `clips.json`, que você escolhe pelas regras de "Início e fim perfeitos" (`references/viral-rules.md`) e
   confere com `check_cut.py` (passo 4d). O "corte sugerido no arquivo" é o arquivo inteiro (ex.: 0:00 a 0:28).
@@ -104,7 +104,7 @@ registra cada short no Notion.
   (`captions.anchor: "above_card"`). Nunca duas legendas ao mesmo tempo.
 - **Saída:** H.264 / yuv420p / 30 fps / AAC; o script confere cada arquivo e falha se não bater.
 
-## Passo -1 — Receber o link e ver se está ao vivo (o usuário só manda o link; sem perguntas)
+## Passo -1 — Receber o link, ver se está ao vivo e fazer as 3 perguntas
 
 Não comece a baixar. Primeiro olhe o vídeo sem baixar:
 ```
@@ -129,7 +129,7 @@ mesmo id, então mandar o link de novo continua de onde parou. Detalhes: `python
 - Nos dois casos, ao terminar o que já passou, diga em uma linha: "A live continua. Me mande o link de novo
   depois que eu continuo de HH:MM:SS, sem repetir" (o histórico guarda onde parou).
 
-**(19/11/2026: NÃO pergunte mais. Link = cortar tudo que ainda não foi cortado, sem blocos para o usuário; internamente em pedaços de ~30 min.)** Antigo: **Três perguntas por link (vídeo ou live), em duas rodadas, logo depois do `--probe` e antes de baixar** (exceto no **modo abertura**, que não pergunta nada; ver a seção dele):
+**Três perguntas por link (de volta a pedido do usuário em 19/11/2026, à noite; vale também para live no ar) (vídeo ou live), em duas rodadas, logo depois do `--probe` e antes de baixar** (exceto no **modo abertura**, que não pergunta nada; ver a seção dele):
 
 Rodada 1, sozinha (o tamanho dos blocos depende dela):
 1. **"Quanto tempo você quer que eu corte?"** Diga na pergunta quanto o vídeo/live tem e de onde começo, ex.:
@@ -172,55 +172,45 @@ vídeo não tiver nada de 1080p para cima, e aí avise o usuário que a fonte é
   real** (ffprobe) e grava em `section.json` o offset REAL. Chat da Twitch, heatmap e "horário no original" usam
   esse offset. Os tempos de `transcript.json`, `cands.json` e `clips.json` são sempre **do arquivo**.
 - Cookies só quando o vídeo pede login/idade, e sempre por cópia temporária do arquivo master.
+- **Live do YouTube no ar:** o script pede os pedaços de ~1 s direto, 16 ao mesmo tempo (`download.live_threads`),
+  ~6x mais rápido que o tempo real (30 min de live em ~5 min). Pedaço que falha é pedido de novo; se continuar
+  faltando, para com erro (nunca deixa buraco no áudio). Se o YouTube frear (403/429), baixe `live_threads` para 8.
 
-## Passo 2 — Detectar o idioma e transcrever o bloco inteiro com o tiny
+## Passo 2 — Transcrever o bloco inteiro com o small
 
 ```
 python scripts/transcribe.py work/<id>/source.mp4
 ```
-Na primeira vez detecta o idioma: 3 a 5 trechos de ~30 s espalhados pelo meio do vídeo (sem começo e fim),
-modelo `tiny`, vence o idioma que mais aparece → `work/<id>/lang.json`. As transcrições seguintes usam esse
-idioma (`--language xx` só se a detecção errar). Depois transcreve tudo com `transcribe_fast` (tiny, beam 1):
-precisão baixa, serve para ler e achar candidatos. Se o texto vier ilegível, suba para `base` no config.
+Detecta o idioma na primeira vez (`lang.json`) e transcreve tudo com `transcribe_fast` = **small, beam 1**
+(~2,4 min por 30 min de live; o tiny saía ilegível). Não existe mais retranscrição dos candidatos.
 
-## Passo 3 — Ler tudo em blocos de 10 minutos e listar candidatos
+## Passo 3 — Achar candidatos: leitura + varredura de imagens (as duas fontes juntas)
 
-```
-python scripts/read_blocks.py work/<id>              # lista os blocos
-python scripts/read_blocks.py work/<id> --block N    # lê o bloco N (10 min)
-```
-**Leia todos os blocos, do primeiro ao último.** Procure piadas, reviravoltas, discussões, situações
-inesperadas, histórias com desfecho e reações fortes (`references/viral-rules.md`). Anote cada candidato em
-`cands.json`: `[{"id":1,"start":"00:08:05","end":"00:08:40","why":"..."}]`. Seja generoso: anote tudo que pode ser bom; a seleção final vem depois.
+1. `python scripts/read_blocks.py work/<id> --block N` para todos os blocos de 10 min: leia tudo.
+2. `python scripts/extract_frames.py work/<id> --scan 10` → `frames/scan_N.jpg` (1 quadro a cada 10 s, uma
+   folha a cada 10 min). **Abra todas as folhas** (Read). Ache o que a fala não mostra: lugar novo, noite/pôr do
+   sol/chuva, criatura, mecânica, loja/salão/academia, caos, bug, tela de nota.
+3. `python scripts/find_hype.py work/<id> --top 15`: só **adiciona** candidatos (pico sem graça não entra).
+4. Para cada candidato, anote em `cands.json` o **assunto** (ex.: "salão", "polícia", "mergulho") e o tipo,
+   procurando o que está em "O que viraliza" (`references/viral-rules.md`):
+   `[{"id":1,"start":"00:08:05","end":"00:08:40","why":"salão: troca o cabelo pra polícia não reconhecer"}]`.
+5. Corte já aqui quem cai no **Eliminatório** do `viral-rules.md`.
 
-**Apoio, não filtro:** `python scripts/find_hype.py work/<id> --top 15` (áudio, chat da Twitch e "clipa",
-heatmap do YouTube, movimento). Use para conferir seus candidatos e achar trechos que a leitura deixou passar.
-Pico sem graça é descartado; candidato bom sem pico fica. Palavras de um momento (tempo do arquivo):
-`find_hype.py work/<id> --words 00:08:05-00:08:35` (em vídeo do YouTube mostra só a fala).
-
-## Passo 3b — Olhar os frames dos candidatos
+## Passo 3b — Frames densos só dos que sobraram
 
 ```
-python scripts/extract_frames.py work/<id> --candidates work/<id>/cands.json --frames 6
+python scripts/extract_frames.py work/<id> --candidates work/<id>/cands.json --frames 8
 ```
-Abra e analise `work/<id>/frames/cand<N>.jpg` (Read): pega momentos visuais sem fala (batida, explosão, fuga,
-susto) e confirma ou derruba candidatos.
+Para cada um: **o payoff aparece na tela? em que segundo?** Não aparece = fora. O corte começa até 1–2 s antes
+do payoff (ou no gancho falado que leva a ele).
 
-## Passo 3c — Retranscrever só os candidatos com o small
+## Passo 4 — Escolher os cortes (lado a lado) e escrever `clips.json`
 
-```
-python scripts/transcribe.py work/<id>/source.mp4 --candidates work/<id>/cands.json
-```
-Usa `transcribe_refine` (small, beam 5) e troca só esses trechos no `transcript.json`. A margem é
-`transcribe_refine.pad_seconds` (10 s), nunca menor que `pad_folga`: assim o `check_cut.py` tem as palavras
-precisas em volta do início e do fim, e um corte "com folga" tem legenda nos extras.
-
-## Passo 4 — Escolher os cortes e escrever `clips.json`
-
-Releia os candidatos com o small e os frames na cabeça. Escolha pela história/graça, não pelo volume.
-Antes de renderizar, rode `python scripts/progress.py check work/<id>`: ele aponta cortes que repetem um short
-já feito (de outro bloco ou de uma vez anterior). Descarte os repetidos.
-Descarte o que não faz sentido sem contexto. Cada corte começa no gancho e termina logo após o desfecho.
+Ponha todos os candidatos numa tabela (assunto, tipo, payoff e segundo, passa no "teste do corte bom"?) e
+compare **lado a lado**. Ordem: novidade do jogo com payoff na tela > opinião/nota > primeira vez com visual >
+reação forte/caos com desfecho > jogada/fail > zoeira. **Variedade:** no máximo 1 corte por assunto no link
+(confira também os blocos anteriores e `progress.py check`); misture tipos. Bloco fraco entrega menos; nunca
+complete com corte fraco. Rode `python scripts/progress.py check work/<id>` e descarte os repetidos.
 
 **Início e fim perfeitos** (o short é postado sem editar; regras completas em `references/viral-rules.md`):
 - **Início:** no gancho, a primeira frase ou ação que já prende (nunca cumprimento, "então", "tipo", silêncio,
@@ -322,19 +312,18 @@ das palavras dentro do tempo da frase.
    arquivo (sem folga é o arquivo inteiro, ex.: "0:00 a 0:28"), horário no original e a ordem sugerida para postar.
 3. No Windows, abra imagens com `Start-Process <png>`; `.mp4` peça para abrir pelo Explorer.
 
-## Passo 6a — Organizar os shorts na pasta numerada (fim de CADA bloco)
+## Passo 6a — Organizar os shorts na pasta do streamer (fim de CADA bloco)
 
 ```
-python scripts/organize_shorts.py work/<id>-b<N>
+python scripts/organize_shorts.py work/<pasta> --streamer <nome igual à opção Streamer do Notion>
 ```
-Os shorts finais ficam em **`paths.shorts_root`** (padrão `C:\cortes\shorts`), **uma subpasta numerada por link**:
-o primeiro link que o usuário mandou é a pasta `1`, o segundo é a `2`, e assim por diante. **Todos os blocos do
-mesmo link vão para a mesma pasta** (mandar o mesmo link de novo continua nela). Cada arquivo sai como
-`NN_GANCHO DO SHORT.mp4` (NN continua de bloco em bloco) e a pasta ganha um `lista-de-postagem.md` (título,
-descrição, hashtags e horário no original). O registro de qual link é qual número fica em
-`shorts\_registro.json` (não mexer). A limpeza do dia apaga as subpastas (`shorts\1`, `shorts\2`...) e o registro, mas não a pasta `shorts`; a numeração volta para 1.
-Avise o usuário em qual pasta numerada os shorts ficaram. No Notion, o campo `Arquivo` usa `final_file` do
-`renders.json` (caminho dentro de `shorts\<número>\`).
+Os shorts ficam em **`paths.shorts_root`** (`C:\cortes\shorts`), **uma subpasta por streamer**, com o mesmo nome
+da opção `Streamer` no Notion (ex.: `C:\cortes\shorts\coringa\`). Cada arquivo sai como `NN_GANCHO.mp4`: **NN é o
+ID do short** (o mesmo número vai no campo `ID` do Notion). O ID é por streamer e só cresce, mesmo depois da
+limpeza do dia (registro em `historico/shorts_registro.json`, não mexer). Só os vídeos ficam na pasta (título, hashtags e o resto estão no Notion).
+Short refeito (gancho/tempo trocado): o script mantém o MESMO ID, copia o novo e manda o antigo para a **Lixeira
+do Windows** (nada de pasta de antigos). O script imprime `ID <streamer> <n> <arquivo>` por short: use no Notion.
+Canal já visto antes não precisa de `--streamer` (o registro lembra).
 
 ## Passo 6b — Gravar no histórico (fim de CADA bloco, sempre)
 
@@ -342,15 +331,25 @@ Avise o usuário em qual pasta numerada os shorts ficaram. No Notion, o campo `A
 python scripts/progress.py done work/<id> --block-minutes <tamanho do bloco em minutos>
 ```
 Grava o trecho do bloco (tempo do original, com o offset real) e os shorts renderizados no histórico do vídeo.
-Rode mesmo quando o bloco não teve nenhum short: assim o trecho conta como já visto. Depois atualize a linha
-do vídeo em "Progresso dos Vídeos" no Notion (passo 8, item 3).
+Rode mesmo quando o bloco não teve nenhum short: assim o trecho conta como já visto. 
 
-## Passo 7 — Trocar gancho (quando o usuário pedir)
+## Passo 7 — Trocar gancho (pelo Notion ou pelo chat)
 
-O usuário manda `corte N: GANCHO` (uma frase só). Edite `hook` do corte N no `clips.json`, rode
-`make_shorts.py work/<id> --only N` (só ele é renderizado de novo) e atualize a **mesma** linha do Notion
-(passo 8, pelo `notion_page_id`) e rode `progress.py done work/<id>` de novo (atualiza, não duplica).
-O modo bloco por bloco continua sozinho.
+**Pelo Notion (jeito principal, pedido em 19/11/2026):** o usuário muda o `Gancho` (e/ou `Título e hashtags`) na
+base "Resultados dos Cortes" e manda algo como "atualiza do Notion". Então:
+1. Busque as linhas da base (query) e grave num json: `[{"page_id","Gancho","Título e hashtags"}, ...]`
+   (só as linhas que ainda têm arquivo no PC: as de hoje).
+2. `python scripts/notion_sync.py linhas.json` mostra o que mudou; `--apply` grava no `clips.json` (backup
+   `clips.json.bak_notion`) e imprime `RENDER <pasta> --only N` para cada short com gancho novo.
+3. Para cada `RENDER`: `make_shorts.py <pasta> --only N` e `organize_shorts.py <pasta>`: o short novo fica com o
+   **mesmo ID** e o arquivo antigo vai para a Lixeira. Atualize na **mesma** linha do Notion o `Arquivo` (pelo
+   `notion_page_id`). Rode `progress.py done <pasta>` de novo.
+4. Título/hashtags mudados não precisam de render: o `clips.json` já fica certo para o kit.
+5. Responda em uma linha por short: "#N gancho trocado: NOVO GANCHO".
+Short de outro dia (arquivos já apagados pela limpeza) não dá para refazer: avise.
+
+**Pelo chat:** `corte N: GANCHO` → edite `hook` do corte N no `clips.json` e siga o item 3 acima, atualizando
+também o `Gancho` da linha no Notion.
 
 ## Passo 7b — Ajustar início/fim ou pedir folga (quando o usuário pedir)
 
@@ -364,48 +363,29 @@ ajuste o `captions_pt` se for gringo, rode `make_shorts.py work/<id> --only N`, 
 `progress.py done work/<id>`, e atualize a **mesma** linha do Notion se o `Arquivo` mudar (pelo
 `notion_page_id`, nunca crie outra).
 
-## Passo 8 — Registrar no Notion (automático)
+## Passo 8 — Registrar no Notion (automático) — só a base "Resultados dos Cortes"
 
-Usa o MCP do Notion do usuário (`claude mcp add --transport http --scope user notion https://mcp.notion.com/mcp`,
-depois `/mcp` para autorizar). Bases em `config.json` → `notion`:
-`resultados_data_source` ("Resultados dos Cortes") e `canais_data_source` ("Canais para Cortes").
-Os dados de cada short estão em `shorts/renders.json`. Base de progresso: `progresso_data_source`
-("Progresso dos Vídeos").
+**Tudo fica numa base só** (pedido do usuário em 19/11/2026): `notion.resultados_data_source` ("Resultados dos
+Cortes"), visão "Por streamer" (agrupada por streamer). **Não use mais** "Progresso dos Vídeos" nem "Canais
+para Cortes". Uma linha por short final, com só estes campos:
+- `Gancho` (título): `hook_text` do `renders.json`, um texto só.
+- `ID` (número): o número do short na pasta do streamer (o NN de `NN_GANCHO.mp4`, impresso pelo `organize_shorts.py`).
+- `Streamer` (seleção): o streamer do link, **com o nome exato de uma opção que já existe** (o usuário define os
+  nomes no Notion: hoje `alanzoka`, `paulinhooloko`, `bistecone`, `coringa`, `gameplayrj`). Ache pelo
+  `channel`/`uploader` do `info.json` (ex.: "LOUD Coringa" → `coringa`). Antes de gravar, busque as opções atuais
+  da base (fetch), porque o usuário pode renomear. Streamer que não está na lista: crie a opção em minúsculas, sem
+  espaço, listando as antigas + a nova (`ALTER COLUMN "Streamer" SET SELECT(...)`), e avise em uma linha.
+- `Título e hashtags`: `title` + espaço + hashtags separadas por espaço (sem repetir a hashtag do fim do título).
+- `Arquivo`: caminho final do .mp4 (`final_file` do `renders.json`).
+- `Live`: link da live/vídeo (`webpage_url` do `info.json`).
+- `Trecho`: horário do corte **no original** (ex.: `00:37:56–00:38:26`).
+- `Data`: dia em que o short foi feito.
+Grave o id da página no corte (`"notion_page_id"` no `clips.json`). Corte com `notion_page_id` (gancho ou tempo
+mudou): **atualize essa linha**, nunca crie outra. Short refeito/descartado: atualize ou apague a linha dele.
 
-Para cada short renderizado:
-1. **Linha em "Resultados dos Cortes"** (só o que o usuário precisa para postar: Gancho, Título e hashtags, Arquivo, mais o Link para separar;
-   aprovado em 17/11/2026; título e hashtags juntos numa coluna só desde 18/11/2026):
-   - `Gancho` (título): **um texto só**, sem barra: `hook_text` do `renders.json` (ex.: "EXPLODIU TUDO NA CARA
-     DA POLÍCIA")
-   - `Título e hashtags` (uma coluna só, pronta para copiar e colar): `title` do kit + espaço + `hashtags`
-     separadas por espaço. Se o título já termina com uma hashtag que está na lista (ex.: `#alanzoka`), tire do
-     fim do título para não repetir. Ex.: `Ele abriu o GTA 6 e o som sumiu na hora 😭 #bisteconee #gta6 #gtavi
-     #shorts #cortes #fail`. Sempre preencha. A descrição fica só no kit (não vai para o Notion).
-   - `Arquivo`: caminho final do .mp4 na pasta numerada (`final_file` do `renders.json`, depois do passo 6a)
-   - `Link` (seleção): `"N · <título do vídeo>"`, com N = número da pasta desse link
-     (`shorts\_registro.json` → `links`, o mesmo de `C:\cortes\shorts\N`) e o título do `info.json`, ex.:
-     `"1 · iShowSpeed Plays I Wanna Test This Game.."`. Todos os blocos do mesmo link usam a mesma opção. Link
-     novo: crie a opção (`ALTER COLUMN "Link"` listando as opções antigas + a nova, cor diferente da anterior).
-     A visão "Por link" agrupa a tabela por esse campo, um bloco por link.
-   Só esses 4 campos: não crie outros nesta base. Grave o id da página criada no corte (`"notion_page_id"` no
-   `clips.json`). Se o corte já tiver `notion_page_id` (gancho trocado, tempo ajustado), **atualize essa linha**
-   (`Gancho`, `Arquivo` e o que mais mudou), não crie outra.
-2. **Base de canais** ("Canais para Cortes", opcional): se existir e não estiver na lixeira, procure o canal
-   (título `Canal`); se não existir, crie com `Canal`, `Link` (`channel_url`/`uploader_url` do `info.json`),
-   `Plataforma` (YouTube, Twitch, Kick ou Outro) e `Status` "Cortando". Para cada short novo: `Cortes feitos` +1
-   e `Último corte` = hoje. Se a base estiver na lixeira ou der erro, pule este item sem avisar a cada short
-   (uma linha no fim do bloco basta).
-3. **Progresso do vídeo** (uma linha por vídeo/live, no fim de cada bloco, depois do `progress.py done`;
-   formato aprovado em 17/11/2026): `python scripts/progress.py notion work/<id>` imprime os campos prontos:
-   - `Streamer` (título da linha): nome do canal/streamer (`channel`/`uploader` do `info.json`)
-   - `Link da live`: link do vídeo/live
-   - `ID do vídeo` e `Trechos cortados` (ex.: `00:00:00–01:12:47`): aparecem na visão "Lives"; são a
-     reserva da skill caso o histórico do PC (`historico/`) suma. Sempre preencha os dois.
-   Só esses 4 campos (não crie outros nesta base). Status e aviso ("A live continua…", "Concluído") vão só para a
-   mensagem no chat, não para o Notion. Se `notion_page_id` vier vazio, crie a linha e guarde o id com
-   `progress.py set-notion work/<id> <page_id>`; se vier preenchido, **atualize essa linha** (nunca crie outra).
-   Se o histórico local sumir, procure a linha pelo `ID do vídeo` antes de criar e use os `Trechos cortados`
-   dela para não repetir.
+**Até onde já cortei:** o histórico local (`historico/`, `progress.py`) continua sendo a fonte principal. Se ele
+sumir, consulte esta base filtrando por `Live` e use os `Trecho` para não repetir (o último trecho mostra até onde
+foi). Rode `progress.py done` normalmente no fim de cada bloco; não precisa escrever nada em outra base.
 
 Se o Notion não estiver disponível, renderize normal e avise em uma linha ("Notion indisponível: os shorts não
 foram registrados"); não trave.
@@ -420,7 +400,7 @@ Instalada uma vez com `python scripts/install_cleanup.py` (atalho escondido na p
 sem admin; `--remove` desinstala). Toda vez que o usuário entra no Windows, `scripts/cleanup.py` apaga em
 `paths.work_root` tudo o que não foi mexido nas últimas `cleanup.idle_hours` (3) horas: vídeos baixados,
 transcrições, frames, temporários **e os shorts prontos**, e também as subpastas de `paths.shorts_root`
-(`shorts\1`, `shorts\2`..., com o `_registro.json`; a pasta `shorts` fica; `cleanup.shorts_subfolders`).
+(`shorts\coringa`, `shorts\alanzoka`...; a pasta `shorts` fica; `cleanup.shorts_subfolders`). Os IDs não voltam para 1: o registro fica no `historico/`.
 Fica só `historico/` (de onde cada vídeo/live parou).
 O Notion não é mexido (o usuário diz o que apagar lá, quando quiser). Por isso:
 - No fim de cada bloco, avise: "os shorts ficam na pasta até você desligar; amanhã, ao ligar, são apagados".
@@ -434,10 +414,10 @@ Quando o usuário manda o link junto com horários (ex.: "1:23:40", "1:23:40-1:2
 **não pergunte nada** (nem tempo, blocos ou reels) e corte só esses momentos:
 - Horário solto = o momento está ali: baixe de 1 min antes a 1 min depois (`--analysis`), transcreva, olhe os
   frames e ache o gancho e o desfecho em volta dele. Faixa "A-B" = o corte fica dentro dela (pode apertar).
-- Cada corte até 30 s (regra geral), começando no gancho. Texto que vier junto (ex.: "grito", um gancho) vale
+- Cada corte com o tamanho que o momento pede (sem limite de 30 s), começando no gancho. Texto que vier junto (ex.: "grito", um gancho) vale
   como dica ou como o próprio gancho.
 - Live no ar: só dá para cortar o que já passou; horário no futuro → avise e espere.
-- Resto igual: fetch_hd, make_shorts, organize, `progress.py done`, Notion com "O que acontece" e 2 outros ganchos.
+- Resto igual: fetch_hd, make_shorts, organize, `progress.py done` e Notion (passo 8).
 
 ## Modo abertura (lançamento do jogo: "abertura" + link)
 
@@ -453,9 +433,9 @@ abrir o jogo + os melhores momentos dos primeiros 30 min de jogo**, rápido, sem
    - Link novo chegou: rode só o `--probe`, ponha na fila e responda **uma linha**: "Entrou na fila: #N <streamer>
      (na frente: X)". Link repetido (mesmo ID) não entra duas vezes: diga em qual posição ele já está.
    - Faça um link por vez, na ordem (o download do próximo pode rodar enquanto o atual transcreve/renderiza).
-     Cada link tem a própria pasta de trabalho (`work/<id>-abertura/`) e a própria pasta numerada de shorts, então
+     Cada link tem a própria pasta de trabalho (`work/<id>-abertura/`) e os shorts vão para a pasta do streamer, então
      nada se mistura.
-   - A cada link pronto, uma mensagem curta: "#N <streamer> pronto: <k> shorts em C:\cortes\shorts\<pasta>
+   - A cada link pronto, uma mensagem curta: "#N <streamer> pronto: <k> shorts em C:\cortes\shorts\<streamer>
      (fila: faltam Y)". Se o usuário perguntar "como está a fila?", mostre o `fila.md` em tabela.
 2. **`download.py "<URL>" --probe`.** Se o histórico já marcar a abertura dessa live como feita, diga e passe
    para o próximo link. Twitch VOD: o `--probe` mostra os **capítulos** (categoria/jogo); o capítulo do jogo
@@ -463,8 +443,7 @@ abrir o jogo + os melhores momentos dos primeiros 30 min de jogo**, rápido, sem
 3. **Achar a abertura** (o ponto em que o jogo começa na tela: logo, primeira tela, primeira cena):
    - Com capítulo do jogo: a abertura está no começo desse capítulo (confira nos frames).
    - Sem capítulo (YouTube): baixe janelas de 20 min a partir do início (`--section 00:00:00-00:20:00`,
-     `00:20:00-00:40:00`…), transcreva com o tiny e olhe frames espalhados (`extract_frames.py` com candidatos a
-     cada 2 min) até ver o jogo na tela. Pare na primeira janela em que o jogo aparece.
+     `00:20:00-00:40:00`…), transcreva e olhe a varredura de frames (`extract_frames.py --scan 10`) até ver o jogo na tela. Pare na primeira janela em que o jogo aparece.
    - Live no ar em que o jogo ainda não apareceu em nada do que já passou: diga "ainda não abriu o jogo, me
      manda de novo daqui a pouco" e passe para o próximo link. Não fique checando sozinho.
 4. **Trecho a cortar:** da abertura (A) até A + 30 min (`abertura.minutes_after` no config). 30 min é o
@@ -476,7 +455,7 @@ abrir o jogo + os melhores momentos dos primeiros 30 min de jogo**, rápido, sem
      reação. Gancho tipo "A REAÇÃO DELE ABRINDO O GTA 6". Música alta: corte mesmo assim, com o `aviso`.
    - **Mais até `abertura.max_extra` (5) melhores momentos** desses 30 min, pelas regras de `viral-rules.md`.
      É teto, não meta: se não tiver momento bom, entregue só a abertura.
-6. **Pasta, histórico e Notion** como sempre (passos 6a, 6b e 8): mesma pasta numerada e mesmo "Link N" se o
+6. **Pasta, histórico e Notion** como sempre (passos 6a, 6b e 8): mesma pasta do streamer e mesmo `Streamer` no Notion se o
    link já tiver sido mandado antes. `progress.py done` grava o trecho cortado, então se o usuário depois pedir
    a live inteira, a abertura e esses 30 min não são repetidos (e não sai uma segunda abertura).
 7. No fim de cada link, diga em uma linha: os shorts (gancho e arquivo) e, se a live continua, "Me mande o link
@@ -501,7 +480,7 @@ abrir o jogo + os melhores momentos dos primeiros 30 min de jogo**, rápido, sem
 
 ## Como o usuário edita depois
 
-- **Gancho:** "corte N: GANCHO" (passo 7). **Tempo do corte:** "corte N: começa/termina X s antes/depois" ou
+- **Gancho:** muda no Notion e manda "atualiza do Notion", ou "corte N: GANCHO" no chat (passo 7). **Tempo do corte:** "corte N: começa/termina X s antes/depois" ou
   "esse com folga" (passo 7b). Se mudar título ou hashtags, atualize também a linha do Notion.
 - **Visual** (cores, tamanhos, posição, logo, nome do canal): `templates/cam.json` ou `nocam.json`.
 - Antes de sobrescrever shorts já aprovados, guarde cópia (ex.: `shorts_antigo/`).

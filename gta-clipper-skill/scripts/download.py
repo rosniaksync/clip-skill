@@ -155,7 +155,9 @@ def base_opts(cfg, url, cookie_copy=None, player_client=None, verbose=False):
     if player_client:
         ea["youtube"] = {"player_client": [player_client]}
     o = {"quiet": True, "noprogress": True, "noplaylist": True, "logger": QuietLogger(verbose),
-         "js_runtimes": {"node": {"path": node}}, "extractor_args": ea}
+         "js_runtimes": {"node": {"path": node}}, "extractor_args": ea,
+         # pedaço que falha não é pulado em silêncio (antes: buraco no áudio sem aviso)
+         "skip_unavailable_fragments": False, "fragment_retries": 20}
     if is_youtube(url):
         o["sleep_interval_requests"] = float(cfg.get("download", {}).get("sleep_requests", 1.0))
     if cookie_copy:
@@ -355,6 +357,98 @@ def twitch_chat(url, out, rng, offset, cfg):
     finally:
         if os.path.exists(raw):
             os.remove(raw)
+
+
+# ---------------------------------------------------------------- YouTube ao vivo: pedaços em paralelo
+
+def _live_pick(formats, h):
+    """Formatos 'do começo' da live (fragments gerado): vídeo na altura h (prefere H.264) e áudio m4a."""
+    fr = [f for f in formats if callable(f.get("fragments"))]
+    vids = [f for f in fr if f.get("vcodec") not in (None, "none") and f.get("height")]
+    auds = [f for f in fr if f.get("vcodec") in (None, "none") and f.get("acodec") not in (None, "none")]
+    if not vids or not auds:
+        return None, None
+    hs = sorted({int(f["height"]) for f in vids})
+    hh = min([x for x in hs if x >= h] or [hs[-1]]) if h else hs[-1]
+    vv = [f for f in vids if int(f["height"]) == hh]
+    vv.sort(key=lambda f: (str(f.get("vcodec", "")).startswith("avc1"), f.get("tbr") or 0), reverse=True)
+    auds.sort(key=lambda f: (f.get("ext") == "m4a", f.get("abr") or 0), reverse=True)
+    return vv[0], auds[0]
+
+
+def live_fast(y, url, rng, h, out, mp4, cfg):
+    """Live do YouTube no ar: em vez do 'live_from_start' do yt-dlp (1 pedaço por vez, ~1 s por pedido), pede
+    os pedaços (sq) direto, `download.live_threads` (16) ao mesmo tempo, áudio e vídeo. Pedaço vazio/falho é
+    pedido de novo; se continuar faltando, para com erro (nunca deixa buraco). -> (offset, lead)."""
+    from concurrent.futures import ThreadPoolExecutor
+    from yt_dlp.utils import update_url_query
+    dcfg = cfg.get("download", {})
+    threads = int(dcfg.get("live_threads", 16))
+    tries = int(dcfg.get("live_fragment_retries", 6))
+    def first_url(f):
+        for frag in f["fragments"]({}):
+            return frag
+        return None
+
+    linfo = vf = af = None
+    bases = {}
+    for attempt in range(4):        # o gerador do YouTube às vezes volta vazio: pergunta de novo
+        linfo = y.extract_info(url, download=False)
+        vf, af = _live_pick(linfo.get("formats") or [], h)
+        if not vf:
+            raise RuntimeError("live sem formatos 'do começo' (fragments): não dá para baixar o que já passou")
+        fa, fv = first_url(af), first_url(vf)
+        if fa and fv:
+            bases = {"a": fa, "v": fv}
+            break
+        print(f"  (YouTube não mandou a lista de pedaços; tentando de novo {attempt + 1}/3)", flush=True)
+        time.sleep(3 * (attempt + 1))
+    if not bases:
+        raise RuntimeError("o YouTube não mandou a lista de pedaços da live (tente de novo em alguns minutos)")
+    fd = float(vf.get("target_duration") or af.get("target_duration") or 0)
+    if not fd:
+        cnt = bases["v"].get("fragment_count") or 0
+        el = time.time() - float(linfo.get("release_timestamp") or time.time())
+        fd = (el / cnt) if cnt and el > 0 else 5.0
+    s_sq, e_sq = int(rng[0] // fd), int(math.ceil(rng[1] / fd))
+    sqs = list(range(s_sq, e_sq))
+    print(f"Live: {len(sqs)} pedaços de {fd:g} s ({ts(rng[0])}–{ts(rng[1])}), {threads} ao mesmo tempo, "
+          f"vídeo {vf.get('format_id')} {vf.get('height')}p + áudio {af.get('format_id')}", flush=True)
+
+    def get(base, sq):
+        u = update_url_query(base, {"sq": str(sq)})
+        last = None
+        for k in range(tries):
+            try:
+                b = y.urlopen(u).read()
+                if b:
+                    return b
+                last = "vazio"
+            except Exception as e:      # 403/429/rede: espera um pouco e tenta de novo
+                last = e.__class__.__name__ + ": " + str(e)[:80]
+            time.sleep(0.5 * (k + 1) ** 2)
+        raise RuntimeError(f"pedaço sq={sq} falhou {tries}x ({last})")
+
+    t0 = time.time()
+    parts = []
+    for kind, f in (("áudio", af), ("vídeo", vf)):
+        k1 = "v" if kind == "vídeo" else "a"
+        base = bases[k1]["url"]
+        path = os.path.join(out, f"live_{k1}.{f.get('ext') or 'mp4'}")
+        n, step = 0, max(1, len(sqs) // 10)
+        with open(path, "wb") as fh, ThreadPoolExecutor(threads) as ex:
+            for b in ex.map(lambda q: get(base, q), sqs):
+                fh.write(b)
+                n += 1
+                if n % step == 0:
+                    print(f"  {kind}: {100 * n // len(sqs)}% ({ts(time.time() - t0)})", flush=True)
+        parts.append(path)
+    subprocess.run(["ffmpeg", "-v", "error", "-nostdin", "-y", "-i", parts[1], "-i", parts[0], "-map", "0:v:0",
+                    "-map", "1:a:0", "-c", "copy", "-movflags", "+faststart", mp4], check=True)
+    for p in parts:
+        os.remove(p)
+    print(f"✓ live baixada em {ts(time.time() - t0)}", flush=True)
+    return measure_and_fix(mp4, s_sq * fd)
 
 
 # ---------------------------------------------------------------- YouTube ao vivo: só o que já passou
@@ -657,6 +751,14 @@ def main():
                     except OSError:
                         shutil.copyfile(full, mp4)
                 done = True
+
+        # --- live do YouTube no ar: pedaços pedidos direto, em paralelo (live_fast)
+        if yt_live and rng and not done and dcfg.get("live_fast", True):
+            def go_fast():
+                with yt_dlp.YoutubeDL(opts({"live_from_start": True})) as y:
+                    return live_fast(y, url, rng, h, a.out, mp4, cfg)
+            offset, lead = run_with_login(go_fast)
+            done = True
 
         # --- download normal (trecho por --section, vídeo inteiro, ou live do YouTube)
         if not done:
