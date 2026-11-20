@@ -144,13 +144,18 @@ def main():
         item = {"start": round(secs(c["start"]) + off, 2), "end": round(secs(c["end"]) + off, 2),
                 "hook": c.get("hook"), "subhook": c.get("subhook"), "file": r.get("file"),
                 "notion_page_id": c.get("notion_page_id") or r.get("notion_page_id")}
-        same = next((o for o in hist["clips"] if o.get("file") == item["file"]), None)
+        # mesmo arquivo E mesmo trecho = renderizado de novo; mesmo nome de arquivo com outro trecho
+        # (pasta de trabalho reaproveitada) é um corte novo
+        same = next((o for o in hist["clips"] if o.get("file") == item["file"]
+                     and overlap([item["start"], item["end"]], [o["start"], o["end"]]) >= 0.5), None)
         if same:
             same.update(item)        # renderizado de novo (gancho trocado): atualiza, não duplica
         else:
             hist["clips"].append(item)
             new += 1
-    hist["blocks"] = [b for b in hist["blocks"] if b.get("workdir") != block["workdir"]] + [block]
+    # substitui só o MESMO bloco (mesma pasta e mesmo início); pasta reaproveitada com outro trecho soma
+    hist["blocks"] = [b for b in hist["blocks"]
+                      if not (b.get("workdir") == block["workdir"] and abs(b["start"] - block["start"]) < 1)] + [block]
     block["shorts"] = sum(1 for c in clips if str(c["id"]) in renders)
     if a.block_minutes:
         hist["block_minutes"] = a.block_minutes

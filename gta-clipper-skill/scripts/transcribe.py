@@ -7,23 +7,33 @@ Uso:
   transcribe.py work/<id>/source.mp4 --range 00:12:00-00:13:10        # só esses trechos (pode repetir)
   transcribe.py work/<id>/source.mp4 --detect-only                    # só detecta o idioma (lang.json)
 
-Idioma: na primeira vez, pega 3 a 5 trechos de ~30 s espalhados pelo meio do vídeo (sem começo e fim),
-detecta com o modelo tiny e usa o idioma que mais aparece (config.json -> language_detect). Grava em
-work/<id>/lang.json; as transcrições seguintes usam esse idioma. --language força outro.
+Rápido em CPU: o áudio (16 kHz mono) é extraído uma vez e guardado em work/<id>/audio16k.pcm (as passadas
+seguintes reaproveitam), o modelo usa todos os núcleos (transcribe.cpu_threads, 0 = todos) e a passada roda no
+modo em lote do faster-whisper (transcribe.batch_size; --no-batch volta ao modo antigo, frase por frase).
+O lote não tem o "fallback" de temperatura do modo antigo: os pedaços que saem em laço (frase repetida) são
+refeitos sozinhos no modo antigo. Saída curta: uma linha no fim.
 
-Com --candidates/--range, só esses trechos são transcritos e trocados dentro do transcript.json existente.
+Idioma: na primeira vez, pega 3 a 5 trechos de ~30 s espalhados pelo meio do vídeo (sem começo e fim),
+detecta com o modelo tiny e usa o idioma que mais aparece (config.json -> language_detect). Para cedo se os 3
+primeiros concordarem com folga. Grava em work/<id>/lang.json; as transcrições seguintes usam esse idioma.
+
+Com --candidates/--range, só esses trechos são transcritos e trocados dentro do transcript.json existente
+(o transcript guarda em "refined" os trechos que já passaram pelo small).
 A margem dos candidatos (--pad) é no mínimo max(pad_before, pad_after, pad_folga), para a legenda cobrir um corte com folga.
 """
 import argparse
 import json
 import os
-import shutil
 import subprocess
 import sys
-import tempfile
+import time
 from collections import Counter, defaultdict
 
-from common import load_config, media_duration, read_json, secs, ts, write_json
+import numpy as np
+
+from common import load_config, read_json, secs, ts, utf8_stdout, write_json
+
+SR = 16000
 
 
 def merge_ranges(rs):
@@ -36,17 +46,28 @@ def merge_ranges(rs):
     return out
 
 
-def extract_wav(video, wav, start=None, length=None):
-    cut = ["-ss", f"{start:.2f}", "-t", f"{length:.2f}"] if start is not None else []
-    subprocess.run(["ffmpeg", "-v", "error", "-y", *cut, "-i", video, "-vn", "-ac", "1", "-ar", "16000", wav],
-                   check=True)
+def load_audio(video, workdir):
+    """Áudio 16 kHz mono float32 do vídeo inteiro. Cache em audio16k.pcm (int16), refeito se o vídeo mudar."""
+    pcm, meta = os.path.join(workdir, "audio16k.pcm"), os.path.join(workdir, "audio16k.json")
+    st = os.stat(video)
+    key = {"size": st.st_size, "mtime": int(st.st_mtime)}
+    if os.path.exists(pcm) and read_json(meta) == key:
+        return np.fromfile(pcm, dtype=np.int16).astype(np.float32) / 32768.0
+    raw = subprocess.run(["ffmpeg", "-v", "error", "-nostdin", "-i", video, "-vn", "-ac", "1", "-ar", str(SR),
+                          "-f", "s16le", "-"], capture_output=True, check=True).stdout
+    with open(pcm, "wb") as f:
+        f.write(raw)
+    write_json(meta, key)
+    return np.frombuffer(raw, dtype=np.int16).astype(np.float32) / 32768.0
 
 
 class Models:
-    """Carrega cada modelo uma vez só (CUDA se houver, senão CPU int8)."""
-    def __init__(self):
+    """Carrega cada modelo uma vez só (CUDA se houver, senão CPU int8 com todos os núcleos)."""
+    def __init__(self, cfg):
         self.cache = {}
         self.device, self.ctype = "cpu", "int8"
+        tcfg = cfg.get("transcribe", {})
+        self.threads = int(tcfg.get("cpu_threads", 0)) or (os.cpu_count() or 4)
         try:
             import ctranslate2
             if ctranslate2.get_cuda_device_count() > 0:
@@ -57,8 +78,8 @@ class Models:
     def get(self, name):
         if name not in self.cache:
             from faster_whisper import WhisperModel
-            print(f"Carregando o modelo '{name}' ({self.device})…")
-            self.cache[name] = WhisperModel(name, device=self.device, compute_type=self.ctype)
+            self.cache[name] = WhisperModel(name, device=self.device, compute_type=self.ctype,
+                                            cpu_threads=self.threads if self.device == "cpu" else 0)
         return self.cache[name]
 
 
@@ -86,48 +107,150 @@ def vote(results, min_prob):
     return max(cnt, key=lambda l: (cnt[l], psum[l]))
 
 
-def detect_language(video, cfg, models):
+def detect_language(audio, cfg, models):
     lcfg = cfg.get("language_detect", {})
-    dur = media_duration(video)
+    dur = len(audio) / SR
     starts, L = sample_points(dur, lcfg)
     model = models.get(lcfg.get("model", "tiny"))
-    tmp = tempfile.mkdtemp(prefix="lang_")
+    n_min = int(lcfg.get("min_samples", 3))
     results = []
-    try:
-        for k, s in enumerate(starts, 1):
-            wav = os.path.join(tmp, f"s{k}.wav")
-            extract_wav(video, wav, s, L)
-            _, info = model.transcribe(wav, beam_size=1, vad_filter=True, without_timestamps=True)
-            results.append((info.language, round(float(info.language_probability or 0), 3)))
-            print(f"  amostra {k}/{len(starts)} em {ts(s)}: {info.language} ({results[-1][1]:.2f})")
-    finally:
-        shutil.rmtree(tmp, ignore_errors=True)
+    for s in starts:
+        chunk = audio[int(s * SR):int((s + L) * SR)]
+        try:
+            lang, prob, _ = model.detect_language(audio=chunk, vad_filter=True)
+        except Exception:            # trecho sem fala nenhuma
+            lang, prob = None, 0.0
+        results.append((lang, round(float(prob or 0), 3)))
+        langs = {l for l, p in results}
+        if len(results) >= n_min and len(langs) == 1 and min(p for _, p in results) >= 0.8:
+            break                    # os primeiros concordam com folga: não precisa das outras amostras
     lang = vote(results, float(lcfg.get("min_probability", 0.4)))
     if not lang:
         sys.exit("Não deu para detectar o idioma (amostras sem fala). Rode com --language xx.")
     return lang, [{"start": s, "language": l, "prob": p} for s, (l, p) in zip(starts, results)]
 
 
-def get_language(video, workdir, cfg, models, forced=None):
+def get_language(audio, workdir, cfg, models, forced=None):
     lpath = os.path.join(workdir, "lang.json")
     if forced:
         write_json(lpath, {"language": forced, "source": "manual"})
-        return forced
+        return forced, False
     saved = read_json(lpath)
     if saved and saved.get("language"):
-        return saved["language"]
-    print("Detectando o idioma…")
-    lang, samples = detect_language(video, cfg, models)
+        return saved["language"], False
+    lang, samples = detect_language(audio, cfg, models)
     write_json(lpath, {"language": lang, "source": "auto", "model": cfg.get("language_detect", {}).get("model", "tiny"),
                        "samples": samples})
-    print(f"✓ Idioma detectado: {lang} → lang.json" + ("" if lang == "pt" else
-          "  (vídeo gringo: a legenda do short sai traduzida para português)"))
-    return lang
+    return lang, True
+
+
+def repeats(tokens, times=4, max_n=6):
+    """True se algum trecho de 1..max_n palavras se repete `times` vezes seguidas (laço do whisper)."""
+    t = [x.lower().strip(".,!?…") for x in tokens]
+    for n in range(1, max_n + 1):
+        for i in range(0, len(t) - times * n + 1):
+            g = t[i:i + n]
+            if all(t[i + k * n:i + (k + 1) * n] == g for k in range(1, times)):
+                return True
+    return False
+
+
+def collapse_repeats(words, max_n=6):
+    """Tira repetição em sequência (laço do whisper): trecho de 2+ palavras fica no máximo 2 vezes seguidas
+    ('de um de um de um de um' -> 'de um de um'); palavra sozinha, no máximo 4 ('não não não não')."""
+    out = list(words)
+    changed = True
+    while changed:
+        changed = False
+        t = [w["w"].lower().strip(".,!?…") for w in out]
+        for n in range(1, max_n + 1):
+            keep = 4 if n == 1 else 2
+            i = 0
+            while i + (keep + 1) * n <= len(t):
+                g = t[i:i + n]
+                k = 1
+                while t[i + k * n:i + (k + 1) * n] == g:
+                    k += 1
+                if k > keep:
+                    del out[i + keep * n:i + k * n]
+                    del t[i + keep * n:i + k * n]
+                    changed = True
+                i += 1
+    return out
+
+
+def to_rows(segs, offset):
+    segments, words = [], []
+    for s in segs:
+        ws = [{"w": w.word.strip(), "s": round(w.start + offset, 2), "e": round(w.end + offset, 2)}
+              for w in (s.words or []) if w.word.strip()]
+        words += ws
+        segments.append({"s": round(s.start + offset, 2), "e": round(s.end + offset, 2), "text": s.text.strip(),
+                         "_w": ws})
+    return segments, words
+
+
+def run_pass(model, audio, lang, beam, batched, batch_size, offset, collapse, ngram=0, redo_loops=True, cr_max=2.4):
+    """Transcreve um trecho (array 16 kHz) -> (segments, words, n_refeitos) em tempo do arquivo.
+    Lote = rápido, mas sem o 'fallback' de temperatura do modo antigo. Contra laço (frase repetida):
+      ngram > 0 (passada de leitura, tiny): o modelo não pode repetir sequências de `ngram` tokens no pedaço;
+      redo_loops (passada small): os pedaços que saem em laço (compressão > cr_max ou frase repetida 4x) são
+      refeitos no modo antigo, só eles; collapse: tira repetição em sequência que ainda sobrar (só leitura)."""
+    if batched:
+        from faster_whisper import BatchedInferencePipeline
+        segs, _ = BatchedInferencePipeline(model=model).transcribe(
+            audio, language=lang, beam_size=beam, word_timestamps=True, vad_filter=True, batch_size=batch_size,
+            no_repeat_ngram_size=ngram)
+    else:
+        segs, _ = model.transcribe(audio, language=lang, word_timestamps=True, vad_filter=True, beam_size=beam)
+    segs = list(segs)
+    redo = 0
+    if batched and redo_loops:
+        bad = [s for s in segs if (s.compression_ratio or 0) > cr_max or repeats(s.text.split())]
+        regions = merge_ranges([[max(0.0, s.start - 0.2), s.end + 0.2] for s in bad])
+        good = [s for s in segs if s not in bad]
+        segments, words = to_rows(good, offset)
+        for ra, rb in regions:
+            sub, _ = model.transcribe(audio[int(ra * SR):int(rb * SR)], language=lang, word_timestamps=True,
+                                      vad_filter=True, beam_size=beam)
+            s2, w2 = to_rows(list(sub), offset + ra)
+            lo, hi = offset + ra + 0.2, offset + rb - 0.2      # sem duplicar as palavras da margem
+            segments += [x for x in s2 if lo - 0.1 <= (x["s"] + x["e"]) / 2 <= hi + 0.1]
+            words += [w for w in w2 if lo <= (w["s"] + w["e"]) / 2 <= hi]
+            redo += 1
+        segments.sort(key=lambda x: x["s"])
+        words.sort(key=lambda w: w["s"])
+    else:
+        segments, words = to_rows(segs, offset)
+    if batched and collapse:
+        # o lote às vezes devolve vazio um pedaço com fala (buraco > 12 s): preenche no modo antigo, sem fallback
+        dur = len(audio) / SR
+        edges = [offset] + [x for w in words for x in (w["s"], w["e"])] + [offset + dur]
+        holes = [(edges[i], edges[i + 1]) for i in range(0, len(edges) - 1, 2) if edges[i + 1] - edges[i] > 12]
+        for ha, hb in holes:
+            ra, rb = max(0.0, ha - offset), min(dur, hb - offset)
+            sub, _ = model.transcribe(audio[int(ra * SR):int(rb * SR)], language=lang, word_timestamps=True,
+                                      vad_filter=True, beam_size=beam, temperature=0.0,
+                                      condition_on_previous_text=False, no_repeat_ngram_size=ngram)
+            s2, w2 = to_rows(list(sub), offset + ra)
+            if w2:
+                segments += s2
+                words += w2
+                redo += 1
+        segments.sort(key=lambda x: x["s"])
+        words.sort(key=lambda w: w["s"])
+    if collapse:
+        words = collapse_repeats(words)
+    kept = {id(w) for w in words}
+    for x in segments:                     # texto da frase sem a repetição que saiu das palavras
+        ws = x.pop("_w")
+        if ws and any(id(w) not in kept for w in ws):
+            x["text"] = " ".join(w["w"] for w in ws if id(w) in kept)
+    return [x for x in segments if x["text"]], words, redo
 
 
 def main():
-    if hasattr(sys.stdout, "reconfigure"):
-        sys.stdout.reconfigure(encoding="utf-8")
+    utf8_stdout()
     cfg = load_config()
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("video")
@@ -136,8 +259,10 @@ def main():
     ap.add_argument("--language", help="força o idioma (ex.: pt, en); sem isso usa lang.json / detecção")
     ap.add_argument("--range", action="append", help="só transcreve S-E (hh:mm:ss); pode repetir")
     ap.add_argument("--candidates", help="JSON [{start,end}] (seg ou hh:mm:ss): só esses trechos (passada small)")
+    ap.add_argument("--ids", help="com --candidates: só estes ids (ex.: 1,3,5)")
     ap.add_argument("--pad", type=float, help="margem antes/depois de cada candidato (mín. max(pad_before, pad_after, pad_folga))")
     ap.add_argument("--detect-only", action="store_true", help="só detecta o idioma e grava lang.json")
+    ap.add_argument("--no-batch", action="store_true", help="modo antigo (frase por frase), mais lento")
     a = ap.parse_args()
 
     try:
@@ -145,69 +270,72 @@ def main():
     except ImportError:
         sys.exit("faster-whisper não instalado: pip install -r requirements.txt")
 
+    t0 = time.time()
     out_dir = os.path.dirname(os.path.abspath(a.video))
     tpath = os.path.join(out_dir, "transcript.json")
-    models = Models()
-    lang = get_language(a.video, out_dir, cfg, models, a.language)
+    models = Models(cfg)
+    audio = load_audio(a.video, out_dir)
+    total = len(audio) / SR
+    lang, detected = get_language(audio, out_dir, cfg, models, a.language)
+    if detected:
+        print(f"✓ Idioma detectado: {lang}" + ("" if lang == "pt" else
+              "  (vídeo gringo: a legenda do short sai traduzida para português)"))
     if a.detect_only:
         return
 
     refine = bool(a.candidates or a.range)
     pcfg = cfg.get("transcribe_refine" if refine else "transcribe_fast", {})
+    tcfg = cfg.get("transcribe", {})
     model_name = a.model or pcfg.get("model", "small" if refine else "tiny")
     beam = a.beam or pcfg.get("beam", 5 if refine else 1)
+    batched = not a.no_batch and bool(tcfg.get("batched", True))
+    batch_size = int(tcfg.get("batch_size", 8))
     min_pad = max(float(cfg.get("pad_before", 0)), float(cfg.get("pad_after", 0)), float(cfg.get("pad_folga", 10)))
     pad = max(a.pad if a.pad is not None else float(cfg.get("transcribe_refine", {}).get("pad_seconds", 10)), min_pad)
 
-    total = media_duration(a.video)
     ranges = []
     for r in a.range or []:
         s, e = (secs(x) for x in r.split("-"))
-        ranges.append((max(0.0, s), min(total, e) if total else e))
+        ranges.append((max(0.0, s), min(total, e)))
     if a.candidates:
+        keep = {int(x) for x in a.ids.split(",")} if a.ids else None
         with open(a.candidates, encoding="utf-8") as f:
-            for c in json.load(f):
-                ranges.append((max(0.0, secs(c["start"]) - pad), min(total, secs(c["end"]) + pad) if total
-                               else secs(c["end"]) + pad))
-    ranges = merge_ranges(ranges) if ranges else [[0.0, None]]   # None = vídeo inteiro
+            for i, c in enumerate(json.load(f), 1):
+                if keep is None or int(c.get("id", i)) in keep:
+                    ranges.append((max(0.0, secs(c["start"]) - pad), min(total, secs(c["end"]) + pad)))
+    ranges = merge_ranges(ranges) if ranges else [[0.0, total]]
 
     model = models.get(model_name)
-    tmp = tempfile.mkdtemp(prefix="clipper_")
-    segments, words, duration = [], [], None
-    try:
-        for k, (rs, re_) in enumerate(ranges, 1):
-            wav = os.path.join(tmp, f"a{k}.wav")
-            print(f"Extraindo áudio {k}/{len(ranges)}" + (f" ({ts(rs)}–{ts(re_)})" if re_ is not None else "") + "…")
-            extract_wav(a.video, wav, rs if re_ is not None else None, (re_ - rs) if re_ is not None else None)
-            segs, info = model.transcribe(wav, language=lang, word_timestamps=True, vad_filter=True, beam_size=beam)
-            duration = info.duration if re_ is None else duration
-            for s in segs:
-                words.extend({"w": w.word.strip(), "s": round(w.start + rs, 2), "e": round(w.end + rs, 2)}
-                             for w in (s.words or []) if w.word.strip())
-                segments.append({"s": round(s.start + rs, 2), "e": round(s.end + rs, 2), "text": s.text.strip()})
-                print(f"\r  transcrito até {ts(s.end + rs)}", end="", flush=True)
-            print()
-            os.remove(wav)
-    finally:
-        shutil.rmtree(tmp, ignore_errors=True)
+    segments, words, redo = [], [], 0
+    for rs, re_ in ranges:
+        seg, wds, n = run_pass(model, audio[int(rs * SR):int(re_ * SR)], lang, beam, batched, batch_size, rs,
+                               collapse=not refine, ngram=int(pcfg.get("no_repeat_ngram", 0 if refine else 3)),
+                               redo_loops=refine)
+        segments += seg
+        words += wds
+        redo += n
 
-    if ranges[0][1] is not None and os.path.exists(tpath):   # troca só os trechos dentro do transcript existente
-        with open(tpath, encoding="utf-8") as f:
-            old = json.load(f)
-
+    old = read_json(tpath) if refine else None
+    refined = []
+    if old:                                   # troca só os trechos dentro do transcript existente
         def outside(x):
             return all(x["e"] <= rs or x["s"] >= re_ for rs, re_ in ranges)
         words = [w for w in old["words"] if outside(w)] + words
         segments = [x for x in old["segments"] if outside(x)] + segments
-        duration = old.get("duration")
+        refined = old.get("refined") or []
+    if refine:
+        refined = merge_ranges([list(r) for r in refined] + [[round(rs, 2), round(re_, 2)] for rs, re_ in ranges])
     words.sort(key=lambda w: w["s"])
     segments.sort(key=lambda x: x["s"])
-    write_json(tpath, {"language": lang, "duration": duration or total, "segments": segments, "words": words},
-               indent=None)
+    write_json(tpath, {"language": lang, "duration": (old or {}).get("duration") or total, "segments": segments,
+                       "words": words, "refined": refined}, indent=None)
     with open(os.path.join(out_dir, "transcript.txt"), "w", encoding="utf-8") as f:
         for s in segments:
             f.write(f"[{ts(s['s'])}] {s['text']}\n")
-    print(f"✓ {len(segments)} frases, {len(words)} palavras ({model_name}, idioma {lang}) → transcript.json / transcript.txt")
+    dt = time.time() - t0
+    span = sum(re_ - rs for rs, re_ in ranges)
+    print(f"✓ {model_name}: {span / 60:.1f} min de áudio em {dt:.0f} s — {len(words)} palavras, idioma {lang}"
+          + (f", {redo} trecho(s) refeito(s) sem laço" if redo else "") + " → transcript.json")
 
 
 if __name__ == "__main__":

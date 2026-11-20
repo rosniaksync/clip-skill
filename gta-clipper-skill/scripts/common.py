@@ -13,7 +13,33 @@ PATH_ENV = {
     "pot_script": "BGUTIL_POT_SCRIPT",
     "twitch_cli": "TWITCH_DOWNLOADER_CLI",
     "work_root": "CORTES_WORK_ROOT",
+    "shorts_root": "CORTES_SHORTS_ROOT",
 }
+
+
+def utf8_stdout():
+    """Windows: saída em UTF-8 (acentos e emoji) mesmo sem PYTHONIOENCODING."""
+    import sys
+    for s in (sys.stdout, sys.stderr):
+        if hasattr(s, "reconfigure"):
+            s.reconfigure(encoding="utf-8", errors="replace")
+
+
+def work_root(cfg=None):
+    return cfg_path("work_root", cfg) or os.path.join(SKILL_DIR, "work")
+
+
+def fmt_hms(t):
+    """segundos -> M:SS ou H:MM:SS (compacto, para leitura)"""
+    t = int(round(max(0.0, t)))
+    return f"{t // 3600}:{t % 3600 // 60:02d}:{t % 60:02d}" if t >= 3600 else f"{t // 60}:{t % 60:02d}"
+
+
+def fmt_precise(t):
+    """segundos -> HH:MM:SS.cc (tempo de corte, 2 casas)"""
+    t = max(0.0, t)
+    cs = int(round(t * 100))
+    return f"{cs // 360000:02d}:{cs // 6000 % 60:02d}:{cs // 100 % 60:02d}.{cs % 100:02d}"
 
 
 def load_config():
@@ -104,8 +130,7 @@ def video_key(extractor, vid):
 
 def history_path(extractor, vid, cfg=None):
     """<work_root>/historico/<plataforma>_<id>.json — um arquivo por vídeo/live, entre uma vez e outra."""
-    root = cfg_path("work_root", cfg) or os.path.join(SKILL_DIR, "work")
-    return os.path.join(root, "historico", video_key(extractor, vid) + ".json")
+    return os.path.join(work_root(cfg), "historico", video_key(extractor, vid) + ".json")
 
 
 def merge_spans(spans):
@@ -119,9 +144,11 @@ def merge_spans(spans):
 
 
 def history_summary(hist):
-    """(trechos já cortados juntados, até onde está coberto desde o começo, nº de shorts)."""
+    """(trechos já cortados juntados, fim do último trecho cortado, nº de shorts).
+    A próxima rodada continua depois do último trecho cortado: no modo abertura (ex.: 0:40–1:10) o bate-papo antes
+    da abertura fica de fora e a live continua de ~1:05, não do começo."""
     spans = merge_spans([[b["start"], b["end"]] for b in hist.get("blocks", [])])
-    covered = spans[0][1] if spans and spans[0][0] <= 1 else 0.0
+    covered = spans[-1][1] if spans else 0.0
     return spans, covered, len(hist.get("clips", []))
 
 

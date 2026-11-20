@@ -43,7 +43,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 from common import SKILL_DIR, load_config, mmss, read_json, section_offset, write_json
 from common import ts as hms
-STYLES = ("cam", "nocam")
+STYLES = ("cam", "nocam", "faixa")
 FPS = 30
 
 # ---------------------------------------------------------------- helpers
@@ -227,6 +227,13 @@ def render_card(tpl, clip, tdir, W):
     text_h = sum(m[1] for m in metrics) + box["line_gap"] * (len(items) - 1)
     box_w = text_w + 2 * (box["padding_x"] + bw) + logo_w
     box_h = max(text_h + 2 * (box["padding_y"] + bw), (logo_size + 2 * (bw + 12)) if logo_spec else 0)
+    # card sempre do mesmo tamanho (pedido em 19/11/2026): box.fixed_w / box.fixed_h; o texto fica centrado
+    text_area = text_w
+    if box.get("fixed_w"):
+        box_w = max(box_w, box["fixed_w"])
+        text_area = box_w - 2 * (box["padding_x"] + bw) - logo_w
+    if box.get("fixed_h"):
+        box_h = max(box_h, box["fixed_h"])
 
     ch = clean_text(tpl.get("channel_name", ""), tag.get("uppercase", True))
     tag_img = None
@@ -280,7 +287,7 @@ def render_card(tpl, clip, tdir, W):
     # --- text (optional neon glow behind it)
     tl = Image.new("RGBA", img.size, (0, 0, 0, 0))
     d = ImageDraw.Draw(tl)
-    cx = bx + bw + box["padding_x"] + logo_w + text_w / 2
+    cx = bx + bw + box["padding_x"] + logo_w + text_area / 2
     y = top + (box_h - text_h) // 2
     for (t, f, col), (mw, mh, mtp, ml) in zip(items, metrics):
         d.text((int(cx - mw / 2) - ml, y - mtp), t, font=f, fill=hex_rgb(col))
@@ -365,6 +372,130 @@ def render_stack(tpl, clip, tdir, W):
         gimg.putalpha(ImageChops.multiply(gimg.getchannel("A"), mask))
         img.alpha_composite(gimg)
     return img, glow_m
+
+
+def key_black(im):
+    """Logo on a black square -> black becomes transparent (alpha from brightness), cropped to the art."""
+    import numpy as np
+    a = np.asarray(im.convert("RGB")).astype(float)
+    mx = a.max(axis=2)
+    alpha = np.clip((mx - 12) * 4, 0, 255)
+    rgb = np.clip(a * 255 / np.maximum(alpha[..., None], 1), 0, 255)   # un-premultiply so edges keep colour
+    out = Image.fromarray(np.dstack([rgb, alpha]).astype("uint8"), "RGBA")
+    box = out.getchannel("A").point(lambda v: 255 if v > 40 else 0).getbbox()
+    return out.crop(box) if box else out
+
+
+def shear(img, k):
+    """Fake italic: lean the image right by k (pixels per pixel of height)."""
+    if not k:
+        return img
+    extra = int(img.height * k) + 2
+    return img.transform((img.width + extra, img.height), Image.AFFINE,
+                         (1, k, -k * img.height, 0, 1, 0), Image.BICUBIC)
+
+
+def rich_line(parts, font):
+    """[(text, '#rrggbb'), ...] on one line -> tight RGBA image."""
+    asc, desc = font.getmetrics()
+    w = int(sum(font.getlength(t) for t, _ in parts)) + 4
+    img = Image.new("RGBA", (w, asc + desc + 4), (0, 0, 0, 0))
+    d = ImageDraw.Draw(img)
+    x = 2
+    for t, col in parts:
+        d.text((x, 2), t, font=font, fill=hex_rgb(col) + (255,))
+        x += font.getlength(t)
+    return img
+
+
+def hook_parts(text, base, hi):
+    """Words starting with @ or wrapped in *asterisks* get the highlight colour."""
+    out = []
+    for i, w in enumerate(text.split()):
+        col = hi if (w.startswith("@") or (w.startswith("*") and w.endswith("*") and len(w) > 2)) else base
+        out.append(((" " if i else "") + w.strip("*"), col))
+    return out
+
+
+def render_faixa(tpl, clip):
+    """faixa style: the whole static frame (background + header + hook) as one 1080x1920 image.
+    The gameplay goes on top of it in ffmpeg (layout.game)."""
+    from PIL import ImageFilter
+    W, H = tpl["canvas"]["w"], tpl["canvas"]["h"]
+    bgs = tpl["layout"]["background"]
+    img = Image.open(skill_path(bgs["file"])).convert("RGBA")
+    if img.size != (W, H):
+        img = img.resize((W, H), Image.LANCZOS)
+
+    # --- header: line  logo  / RSK CORTES  line
+    hd = tpl["header"]
+    lg_spec = hd["logo"]
+    logo = Image.open(skill_path(lg_spec["file"])).convert("RGBA")
+    if lg_spec.get("key_black"):
+        logo = key_black(logo)
+    s = lg_spec["size"] / max(logo.size)
+    logo = logo.resize((int(logo.width * s), int(logo.height * s)), Image.LANCZOS)
+    name = shear(rich_line([tuple(p) for p in hd["parts"]], pil_font(resolve_font(hd["font"]), hd["size"])),
+                 hd.get("italic", 0))
+    nb = name.getbbox() or (0, 0, name.width, name.height)
+    name = name.crop(nb)
+    ln = hd.get("lines") or {}
+    L, G = ln.get("length", 0), ln.get("gap", 0)
+    total = 2 * (L + G) + logo.width + hd["gap"] + name.width
+    x = (W - total) // 2
+    cy = hd["y_center"]
+    d = ImageDraw.Draw(img)
+    if L:
+        d.rectangle([x, cy - ln["width"] // 2, x + L, cy + ln["width"] // 2], fill=hex_rgb(ln["color"]))
+    x += L + G
+    img.alpha_composite(logo, (x, cy - logo.height // 2))
+    x += logo.width + hd["gap"]
+    img.alpha_composite(name, (x, cy - name.height // 2))
+    x += name.width + G
+    if L:
+        d.rectangle([x, cy - ln["width"] // 2, x + L, cy + ln["width"] // 2], fill=hex_rgb(ln["color"]))
+
+    # --- hook: white italic, @canal in pink, up to 2 balanced lines
+    hk = tpl["hook"]
+    up = hk.get("uppercase", True)
+    texts = [clean_text(t, up) for t in lines_of(clip) if t]
+    rows = []
+    if texts:
+        size = hk["size"]
+        path = resolve_font(hk["font"])
+        while True:   # one size for both lines: shrink until the widest fits
+            f = pil_font(path, size)
+            rows = [shear(rich_line(hook_parts(t, hk["color"], hk["highlight_color"]), f), hk.get("italic", 0))
+                    for t in texts]
+            if max(r.width for r in rows) <= hk["max_width"] or size <= hk["min_size"]:
+                break
+            size -= 2
+        rows = [r.crop(r.getbbox() or (0, 0, r.width, r.height)) for r in rows]
+        th = sum(r.height for r in rows) + hk["line_gap"] * (len(rows) - 1)
+        y = hk["y_center"] - th // 2
+        sh = hk.get("shadow")
+        for r in rows:
+            px = (W - r.width) // 2
+            if sh:
+                layer = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+                sc = Image.new("RGBA", r.size, hex_rgb(sh["color"]) + (255,))
+                sc.putalpha(r.getchannel("A").point(lambda v: int(v * sh.get("opacity", 0.8))))
+                layer.alpha_composite(sc, (px + sh["offset"], y + sh["offset"]))
+                img.alpha_composite(layer.filter(ImageFilter.GaussianBlur(sh.get("blur", 0))))
+            img.alpha_composite(r, (px, y))
+            y += r.height + hk["line_gap"]
+    return img.convert("RGB")
+
+
+def filter_faixa(tpl):
+    W = tpl["canvas"]["w"]
+    g = tpl["layout"]["game"]
+    gh, fx = g["height"], g.get("focus_x", 0.5)
+    flags = tpl["layout"].get("scale_flags", "bicubic")
+    f = (f"[0:v]scale={W}:{gh}:force_original_aspect_ratio=increase:flags={flags},"
+         f"crop={W}:{gh}:(iw-{W})*{fx}:(ih-{gh})/2[game];"
+         f"[1:v][game]overlay=0:{g['y']}[base]")
+    return f, "base"
 
 
 # ---------------------------------------------------------------- captions (ASS)
@@ -484,12 +615,36 @@ def filter_cam(tpl, cam, src_w, src_h, card_xy, with_card):
     W = tpl["canvas"]["w"]
     L = tpl["layout"]
     ch, gh, fx = L["cam_height"], L["game_height"], L["game_focus_x"]
-    bw, bh, px, py = cam_box_px(cam, src_w, src_h, W / ch)
     flags = L.get("scale_flags", "bicubic")                  # e.g. "lanczos" for a sharper upscale of the webcam
     sharp = f",{L['cam_sharpen']}" if L.get("cam_sharpen") else ""   # e.g. "unsharp=5:5:0.7:3:3:0.0"
-    f = (f"[0:v]split[c][g];"
-         f"[c]crop={bw}:{bh}:{px}:{py},scale={W}:{ch}:force_original_aspect_ratio=increase:flags={flags},"
-         f"crop={W}:{ch}{sharp}[cam];"
+    fr = L.get("cam_frame")
+    if fr:
+        # Moldura: a webcam inteira (sem cortar) menor, no centro da área de cima, com ela mesma
+        # desfocada atrás. Amplia menos que encher 1080 de largura, então o rosto fica mais nítido.
+        x, y, w, h = cam
+        bw, bh = int(w * src_w) // 2 * 2, int(h * src_h) // 2 * 2
+        px = int(min(max(x * src_w, 0), src_w - bw))
+        py = int(min(max(y * src_h, 0), src_h - bh))
+        fh = int(fr.get("height", 540))
+        maxw = W - 2 * int(fr.get("margin_x", 40))
+        iw = bw * fh / bh
+        if iw > maxw:
+            iw, fh = maxw, maxw * bh / bw
+        iw, fh = int(iw) // 2 * 2, int(fh) // 2 * 2
+        blur = fr.get("blur", 20)
+        dark = fr.get("darken", -0.15)
+        f = (f"[0:v]split[c][g];"
+             f"[c]crop={bw}:{bh}:{px}:{py},split[cb][cf];"
+             f"[cb]scale={W}:{ch}:force_original_aspect_ratio=increase,crop={W}:{ch},"
+             f"boxblur={blur},eq=brightness={dark}[cbg];"
+             f"[cf]scale={iw}:{fh}:flags={flags}{sharp}[cfg];"
+             f"[cbg][cfg]overlay=({W}-{iw})/2:({ch}-{fh})/2[cam];")
+    else:
+        bw, bh, px, py = cam_box_px(cam, src_w, src_h, W / ch)
+        f = (f"[0:v]split[c][g];"
+             f"[c]crop={bw}:{bh}:{px}:{py},scale={W}:{ch}:force_original_aspect_ratio=increase:flags={flags},"
+             f"crop={W}:{ch}{sharp}[cam];")
+    f += (
          f"[g]scale={W}:{gh}:force_original_aspect_ratio=increase:flags={flags},"
          f"crop={W}:{gh}:(iw-{W})*{fx}:0[game];"
          f"[cam][game]vstack[base]")
@@ -534,6 +689,16 @@ def clip_window(clip, cfg, src_dur):
     return rs, re_, s, e
 
 
+def hd_source(workdir, clip, s, e):
+    """Trecho em alta do corte (fetch_hd.py) que cobre [s, e] (tempo do bloco): (arquivo, shift) ou None.
+    Tempo no arquivo hd = tempo do bloco - shift."""
+    reg = read_json(os.path.join(workdir, "hd", "hd.json"), {}) or {}
+    r = reg.get(str(int(clip["id"])))
+    if r and os.path.exists(r["file"]) and r["covers"][0] <= s + 0.01 and r["covers"][1] >= e - 0.05:
+        return r["file"], float(r["shift"])
+    return None
+
+
 def render(workdir, clip, words, args, setup, src_w, src_h, tdir, out_dir, cfg, src_dur, lang):
     style = args.style or clip.get("style")
     if style not in STYLES:
@@ -558,12 +723,24 @@ def render(workdir, clip, words, args, setup, src_w, src_h, tdir, out_dir, cfg, 
     if cut_e <= cut_s or e <= s:
         print(f"  pulando #{clip['id']}: fim antes do início"); return None
     length = e - s
+    # --- fonte: trecho em alta do corte (fluxo rápido) ou o arquivo do bloco
+    src_path, ss = os.path.abspath(args.source), s
+    hd = hd_source(workdir, clip, s, e)
+    if hd:
+        src_path, ss = hd[0], s - hd[1]
+        wh = ffprobe(src_path, "stream=width,height", "v:0").split()[0].split(",")[:2]
+        src_w, src_h = int(wh[0]), int(wh[1])
+    elif (read_json(os.path.join(workdir, "info.json"), {}) or {}).get("analysis"):
+        sys.exit(f"Corte #{clip['id']}: o bloco foi baixado leve (modo análise) e o corte ainda não tem o trecho "
+                 f"em alta. Rode: python scripts/fetch_hd.py {workdir} --only {clip['id']}")
     name = f"short_{int(clip['id']):02d}"
     tmp = tempfile.mkdtemp(prefix=name + "_", dir=out_dir)
     try:
         # --- title overlay (PNG) for the whole clip
         overlay_png, overlay_xy, img, card_margin = None, (0, 0), None, 0
-        if style == "nocam" and "stack" in tpl:
+        if style == "faixa":
+            img = render_faixa(tpl, clip)
+        elif style == "nocam" and "stack" in tpl:
             img, gm = render_stack(tpl, clip, tdir, W)
             overlay_xy = (0, tpl["stack"]["y_top"] - gm)
         elif style == "cam" or "card" in tpl:   # nocam can also use the card (logo + channel tag) instead of the white title
@@ -591,7 +768,14 @@ def render(workdir, clip, words, args, setup, src_w, src_h, tdir, out_dir, cfg, 
                          f"Rode --export-captions {clip['id']}, traduza e grave em captions_pt no clips.json.")
             else:
                 cw = [{"w": w["w"], "s": round(w["s"] - s, 3), "e": round(w["e"] - s, 3)}
-                      for w in words if w["s"] >= s - 0.01 and w["e"] <= e + 0.3]
+                      for w in words if w["s"] >= s - 0.01 and w["e"] <= e + 0.3
+                      and not any(secs(a) - 0.05 <= w["s"] < secs(b) for a, b in clip.get("caption_mute", []))]
+                # caption_mute: trechos (tempo do arquivo) que são fala do JOGO (NPC, cutscene, rádio): sem legenda
+                for x in clip.get("captions_add", []):   # grito/risada que a transcrição não pega (tempo do arquivo)
+                    xs, xe = secs(x["s"]), secs(x["e"])
+                    if xe > s and xs < e:
+                        cw.append({"w": x["w"], "s": round(max(0.0, xs - s), 3), "e": round(min(length, xe - s), 3)})
+                cw.sort(key=lambda w: w["s"])
                 groups = caption_groups(cw, cap)
         has_caps = bool(groups)
         fontsdir = ""
@@ -613,6 +797,8 @@ def render(workdir, clip, words, args, setup, src_w, src_h, tdir, out_dir, cfg, 
             if not cam:
                 sys.exit("O estilo cam precisa da caixa da webcam: rode --snapshot, estime e passe --cam x,y,w,h")
             graph, last = filter_cam(tpl, cam, src_w, src_h, overlay_xy, bool(overlay_png))
+        elif style == "faixa":
+            graph, last = filter_faixa(tpl)
         else:
             graph, last = filter_nocam(tpl, overlay_xy, bool(overlay_png))
         if has_caps:
@@ -620,14 +806,17 @@ def render(workdir, clip, words, args, setup, src_w, src_h, tdir, out_dir, cfg, 
             graph += f";[{last}]ass=cap.ass:fontsdir='{fd}'[cap]"
             last = "cap"
         graph += f";[{last}]format=yuv420p[v]"
+        if overlay_png:   # a imagem fixa é decodificada uma vez e repetida (antes: -loop 1 decodificava a cada quadro)
+            graph = "[1:v]loop=loop=-1:size=1:start=0[ovl];" + graph.replace("[1:v]", "[ovl]")
 
-        cmd = ["ffmpeg", "-v", "error", "-y", "-ss", f"{s:.3f}", "-i", os.path.abspath(args.source)]
+        ENC = load_config().get("encode", {})
+        cmd = ["ffmpeg", "-v", "error", "-nostdin", "-y", "-ss", f"{ss:.3f}", "-i", src_path]
         if overlay_png:
-            cmd += ["-loop", "1", "-framerate", str(FPS), "-i", "overlay.png"]
+            cmd += ["-framerate", str(FPS), "-i", "overlay.png"]
         out_name = f"{name}.mp4"
         cmd += ["-t", f"{length:.3f}", "-filter_complex", graph, "-map", "[v]", "-map", "0:a?",
-                "-c:v", "libx264", "-profile:v", "high", "-pix_fmt", "yuv420p", "-preset", "veryfast",
-                "-crf", "20", "-r", str(FPS),
+                "-c:v", "libx264", "-profile:v", "high", "-pix_fmt", "yuv420p", "-preset", str(ENC.get("preset", "veryfast")),
+                "-crf", str(ENC.get("crf", 20)), "-r", str(FPS),
                 "-af", "loudnorm=I=-14:TP=-1.5:LRA=11", "-c:a", "aac", "-b:a", "160k", "-ar", "48000", "-ac", "2",
                 "-movflags", "+faststart", os.path.abspath(os.path.join(out_dir, out_name))]
         subprocess.run(cmd, check=True, cwd=tmp)
@@ -636,7 +825,7 @@ def render(workdir, clip, words, args, setup, src_w, src_h, tdir, out_dir, cfg, 
 
     out = os.path.join(out_dir, out_name)
     verify(out)
-    return {"file": os.path.abspath(out), "style": style, "render": [s, e], "cut": [cut_s, cut_e]}
+    return {"file": os.path.abspath(out), "style": style, "render": [s, e], "cut": [cut_s, cut_e], "height": src_h}
 
 
 def verify(path):
@@ -676,15 +865,17 @@ def preview(workdir, out_dir):
     shorts = sorted(glob.glob(os.path.join(out_dir, "short_*.mp4")))
     if not shorts:
         sys.exit("Nenhum short renderizado ainda.")
+    from concurrent.futures import ThreadPoolExecutor
     tmp = tempfile.mkdtemp()
-    k = 0
+    jobs = []
     for p in shorts:
         d = duration(p)
         for frac in (0.08, 0.45, 0.85):
-            subprocess.run(["ffmpeg", "-v", "error", "-y", "-ss", f"{d * frac:.2f}", "-i", p,
-                            "-frames:v", "1", "-vf", "scale=360:640",
-                            os.path.join(tmp, f"{k:04d}.jpg")], check=True)
-            k += 1
+            jobs.append((p, d * frac, os.path.join(tmp, f"{len(jobs):04d}.jpg")))
+    with ThreadPoolExecutor(max_workers=min(8, os.cpu_count() or 4)) as ex:
+        list(ex.map(lambda j: subprocess.run(["ffmpeg", "-v", "error", "-nostdin", "-y", "-ss", f"{j[1]:.2f}", "-i", j[0],
+                                              "-frames:v", "1", "-vf", "scale=360:640", j[2]], check=True), jobs))
+    k = len(jobs)
     cols = 3 * 2 if k > 3 else 3
     rows = math.ceil(k / cols)
     out = os.path.join(out_dir, "preview.jpg")
@@ -817,6 +1008,8 @@ def main():
     ap.add_argument("--preview", action="store_true")
     ap.add_argument("--export-captions", type=int, metavar="N", help="original phrases of clip N, to translate")
     ap.add_argument("--kit", action="store_true", help="only rewrite shorts/posting-kit.md")
+    ap.add_argument("--no-fetch", action="store_true",
+                    help="bloco leve: não baixa sozinho o trecho em alta dos cortes que faltam (fetch_hd.py)")
     args = ap.parse_args()
     cfg = load_config()
     wd = args.workdir
@@ -862,17 +1055,45 @@ def main():
     src_w, src_h = int(sw), int(sh)
     os.makedirs(out_dir, exist_ok=True)
 
-    done = []
-    for n, c in enumerate(clips, 1):
-        print(f"● Renderizando ({n}/{len(clips)}) — #{c['id']} [{args.style or c.get('style')}] {c.get('hook', '')}")
+    # bloco baixado leve (fluxo rápido): o trecho em alta de cada corte que falta é baixado em paralelo
+    # (fetch_hd.py) e cada short renderiza assim que o seu trecho chega, enquanto os outros ainda baixam.
+    info = read_json(os.path.join(wd, "info.json"), {}) or {}
+    need = []
+    if info.get("analysis") and not args.no_fetch:
+        need = [c for c in clips if not hd_source(wd, c, *clip_window(c, cfg, src_dur)[:2])]
+    done, heights = [], {}
+
+    def one(c):
+        print(f"● ({len(done) + 1}/{len(clips)}) #{c['id']} [{args.style or c.get('style')}] {c.get('hook', '')}",
+              flush=True)
         res = render(wd, c, words, args, setup, src_w, src_h, args.template_dir, out_dir, cfg, src_dur, lang)
         if res:
             done.append(update_renders(wd, out_dir, c, res, lang))
+            heights[res["file"]] = res.get("height")
+
+    for c in clips:
+        if c not in need:
+            one(c)
+    if need:
+        from fetch_hd import Blocked, fetch_iter
+        print(f"↓ baixando {len(need)} corte(s) em alta em paralelo (cada um renderiza assim que chega)", flush=True)
+        try:
+            for c, r, msg in fetch_iter(wd, need, cfg):
+                print("  " + msg, flush=True)
+                if r:
+                    one(c)
+        except Blocked as e:
+            print(chr(10).join(l for l in str(e).splitlines() if l.startswith(("✗", "  "))))
+            write_posting_kit(wd, out_dir, all_clips, cfg)
+            sys.exit(3)
     kit = write_posting_kit(wd, out_dir, all_clips, cfg)
     print(f"✓ {len(done)} shorts → {out_dir}" + (f"  (kit: {kit})" if kit else ""))
-    for r in done:
-        print(f"  {os.path.basename(r['file'])} | {hook_text(r)} | corte sugerido no arquivo: "
+    for r in sorted(done, key=lambda r: r["file"]):
+        h = heights.get(r["file"])
+        print(f"  {os.path.basename(r['file'])}{f' {h}p' if h else ''} | {hook_text(r)} | corte no arquivo: "
               f"{r['suggested_cut_in_file']} | no original: {r['original_time']}")
+    if len(done) < len(clips):
+        sys.exit(1)
 
 
 if __name__ == "__main__":

@@ -1,0 +1,95 @@
+{
+  "name": "faixa",
+  "description": "Fundo neon (palmeiras e prédios), logo + / RSK CORTES no topo, gancho branco em itálico com @canal em rosa, gameplay inteira (com a webcam da live) numa faixa no meio, sem linhas em volta.",
+  "canvas": {
+    "w": 1080,
+    "h": 1920
+  },
+  "channel_name": "RSK CORTES",
+  "layout": {
+    "background": {
+      "file": "assets/fundo_faixa.png"
+    },
+    "game": {
+      "y": 702,
+      "height": 608,
+      "focus_x": 0.5
+    },
+    "scale_flags": "lanczos"
+  },
+  "header": {
+    "y_center": 230,
+    "logo": {
+      "file": "assets/logo.png",
+      "size": 150,
+      "key_black": true
+    },
+    "gap": 16,
+    "font": {
+      "file": "fonts/Montserrat-Black.ttf"
+    },
+    "size": 46,
+    "italic": 0.2,
+    "parts": [
+      [
+        "/ ",
+        "#FFFFFF"
+      ],
+      [
+        "RSK ",
+        "#FFFFFF"
+      ],
+      [
+        "CORTES",
+        "#FF3DCB"
+      ]
+    ],
+    "lines": {
+      "color": "#FF3DCB",
+      "width": 4,
+      "length": 120,
+      "gap": 22
+    }
+  },
+  "hook": {
+    "y_center": 515,
+    "font": {
+      "file": "fonts/Montserrat-Black.ttf"
+    },
+    "size": 50,
+    "min_size": 36,
+    "max_width": 900,
+    "line_gap": 14,
+    "uppercase": true,
+    "italic": 0.2,
+    "color": "#FFFFFF",
+    "highlight_color": "#FF3DCB",
+    "shadow": {
+      "color": "#000000",
+      "offset": 4,
+      "blur": 6,
+      "opacity": 0.8
+    },
+    "_note": "Palavras que começam com @ (ex.: @ZEVICTTT) ou entre *asteriscos* saem na cor de destaque."
+  },
+  "captions": {
+    "font": {
+      "file": "fonts/Poppins-ExtraBold.ttf"
+    },
+    "bold": false,
+    "size": 69,
+    "uppercase": true,
+    "color": "#FFFFFF",
+    "highlight_color": "#FE5CCD",
+    "highlight_scale": 112,
+    "outline": 4,
+    "outline_color": "#000000",
+    "shadow": 1,
+    "x": 540,
+    "y": 1440,
+    "an": 5,
+    "max_words": 3,
+    "max_chars": 16,
+    "max_gap": 0.6
+  }
+}
