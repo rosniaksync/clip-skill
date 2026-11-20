@@ -64,9 +64,10 @@ registra cada short no Notion.
   **descarte o candidato** (não force `cam` nem `nocam`). Lobby, menu, tela de carregamento e seleção de
   personagem do jogo valem, pois são o que o streamer está transmitindo. Confira nos frames (passo 3b) que a
   parte de baixo mostra conteúdo diferente da webcam.
-  **Webcam sobre o jogo que também apareceria embaixo** (ex.: canto inferior esquerdo): grave no `setup.json` do
-  bloco `"split": "half"` (streamer e jogo do mesmo tamanho, 960/960, card na divisão) e `"game_focus_x"` (0 a 1,
-  ex.: 1.0 = recorte do jogo na direita) para tirar a webcam da metade de baixo. Também vale por corte no `clips.json`.
+  **Webcam sobre o jogo que também apareceria embaixo** (ex.: canto esquerdo): continue com 1/3 webcam e 2/3
+  gameplay (**nunca meio a meio**, pedido em 19/11/2026) e grave no `setup.json` do bloco `"game_focus_x"` (0 a 1,
+  centro do recorte do jogo) para tirar a webcam da parte de baixo **sem cortar o personagem** (ex.: 0.55 na live do
+  Coringa; 1.0 cortou o personagem). Confira no `--snapshot`. Também vale por corte no `clips.json`.
 - **Chat só da Twitch** (`download.chat_twitch`, via TwitchDownloaderCLI). YouTube não baixa chat; no lugar
   dele, o mapa de "mais repetidos" (`heatmap.json`) entra como sinal de apoio (`hype.weights.heatmap`).
 - **Idioma:** detectado sozinho (`language_detect`), nunca fixo. Vídeo em outro idioma = **gringo**: legenda
@@ -74,12 +75,9 @@ registra cada short no Notion.
 
 ## Identidade visual (não mexer sem o usuário pedir)
 
-- **Estilo padrão = `cam` com 1/3 streamer (640) e 2/3 gameplay (1280) (pedido em 19/11/2026, todos os links). `faixa` só se pedir.** Antigo: **Estilo `faixa` (18/11/2026)** (`templates/faixa.json`): fundo neon roxo com palmeiras e
-  prédios e helicóptero (`assets/fundo_faixa.png`, tirado da arte do usuário "Thumbnail Neon da Live no GTA.png"
-  com `scripts/make_faixa_bg.py <arte.png>`; desenho próprio de palmeiras foi recusado, usar sempre a arte dele), no topo `—— logo / RSK CORTES ——`, gancho todo branco em itálico, **sem @canal** (pedido em 18/11/2026: nada de @ nem rosa no gancho), e a tela da
-  live inteira (com a webcam como ela aparece na live) numa faixa de 1080x608 no meio, **sem linhas/bordas
-  em volta**. Legenda palavra por palavra logo abaixo da faixa. Não precisa de caixa da webcam (`--cam`).
-  Gancho sem @ e sem palavra em rosa, ex.: `"ELE JUROU QUE A CASA TAVA PERFEITA KKKK"`. `cam`/`nocam` só se o usuário pedir.
+- **Estilo padrão = `cam`** (pedido em 19/11/2026, todos os links): webcam em cima com 1/3 da altura (640 px) e
+  gameplay embaixo com 2/3 (1280 px), card centrado na divisão. Vídeo sem webcam: `nocam`. O estilo `faixa`
+  (`templates/faixa.json`, fundo neon com a tela da live inteira numa faixa no meio) existe, mas só se o usuário pedir.
 
 - **Logo oficial "RSK CORTES"** (`assets/logo.png`). No card entra redonda (`circle: true`) com margem preta
   (`pad` 0.18, tamanho 134), para a arte aparecer inteira.
@@ -97,7 +95,7 @@ registra cada short no Notion.
 - **Etiqueta "RSK CORTES" na mesma cor do card:** fundo escuro em degradê (#14003A → #050008), borda neon em degradê
   (azul → roxo → rosa → laranja) e texto rosa neon (#FF4FD8), igual à caixa do card (`templates/cam.json`, `card.tag`).
 - **Nome do canal** (`channel_name`): **RSK CORTES**.
-- **Webcam em tela cheia (padrão, confirmado em 18/11/2026):** a webcam enche a área de cima (1080x768). O modo
+- **Webcam em tela cheia (padrão, confirmado em 18/11/2026):** a webcam enche a área de cima (1080x640). O modo
   moldura (`layout.cam_frame`, webcam menor no centro com fundo desfocado) existe no código, mas o usuário testou e
   preferiu voltar ao original. Só ligue se ele pedir.
 - **Legenda do `cam`:** tamanho 69, palavra em destaque rosa (#FE5CCD), `gap` 30 px acima do card
@@ -226,7 +224,7 @@ complete com corte fraco. Rode `python scripts/progress.py check work/<id>` e de
 [
   {
     "id": 1,
-    "style": "faixa",
+    "style": "cam",
     "start": "00:08:05.0",
     "end": "00:08:33.5",
     "hook": "EU TAVA NO FLOW STATE E PEGUEI TODAS AS BOLAS",
@@ -241,7 +239,7 @@ complete com corte fraco. Rode `python scripts/progress.py check work/<id>` e de
 ```
 - `aviso` (opcional): alerta que sai no kit de postagem, ex.: "música do jogo alta: risco de som mudo".
 - `title`, `description` e `hashtags` são **obrigatórios** em todo corte (vão para o kit; título e hashtags também para o Notion).
-- `style`: `"faixa"` (padrão), ou `"cam"` (com webcam) / `"nocam"` se o usuário pedir. `hook` = a frase do card, UMA frase só (até ~8 palavras, sem emoji,
+- `style`: `"cam"` (padrão, com webcam) ou `"nocam"` (sem webcam); `"faixa"` só se o usuário pedir. `hook` = a frase do card, UMA frase só (até ~8 palavras, sem emoji,
   em português); o script quebra em 2 linhas sozinho. Não use `subhook`. `title`, `description`, `hashtags` vão para o kit de postagem.
 - `type`: Reação, Fail, Jogada, Piada, História ou Discussão (fica no `renders.json`; o Notion não usa mais).
 - `start`/`end` = o corte exato do arquivo (com 2 casas decimais, ex.: `00:08:14.73`), conferido no passo 4d.
@@ -270,8 +268,7 @@ da regra, fim no pico do som, transição no começo ou no fim).
 ## Passo 4b — Ver o vídeo e escolher o estilo
 
 `python scripts/make_shorts.py work/<id> --snapshot` → `snapshot.jpg` (6 quadros). Olhe e decida:
-0. Estilo `faixa` (padrão): não precisa achar a webcam; só confira a legenda gravada (item 2).
-1. **Tem webcam?** (só para `cam`/`nocam`) Sim → `cam`; estime o retângulo em frações `x,y,w,h` e confira com
+1. **Tem webcam?** Sim → `cam`; estime o retângulo em frações `x,y,w,h` e confira com
    `make_shorts.py work/<id> --cam x,y,w,h --snapshot` (caixa vermelha dentro da webcam, sem barras de
    overlay). Fica salvo em `setup.json`. Não → `nocam`.
 2. **Legenda gravada na imagem?** Sim → `--burned-subs` (sem legenda palavra por palavra).
@@ -293,12 +290,12 @@ das palavras dentro do tempo da frase.
 
 `python scripts/make_shorts.py work/<id> [--only 1,2]`
 
-- **`faixa`:** fundo + topo + gancho numa imagem só; a tela da live inteira em y=702 (1080x608), sem bordas;
-  legenda em y=1440.
-- **`cam`:** topo 768 px = webcam; baixo 1152 px = gameplay; card centrado na divisão (y=768) o vídeo todo;
-  legenda acima do card.
+- **`cam`** (padrão): topo 640 px = webcam; baixo 1280 px = gameplay; card centrado na divisão (y=640) o vídeo
+  todo; legenda acima do card.
 - **`nocam`** (layout `stack` em `nocam.json`): fundo desfocado, logo RSK redonda com anel rosa→laranja no topo,
   gancho em degradê GTA com contorno e brilho, gameplay no meio, legenda rosa embaixo.
+- **`faixa`** (só se o usuário pedir): fundo + topo + gancho numa imagem só; a tela da live inteira em y=702
+  (1080x608), sem bordas; legenda em y=1440.
 - Cada short = exatamente o corte (`start` a `end`); com `"folga": true`, o corte + `pad_folga` dos dois lados.
   O script imprime, por short: arquivo, gancho e "corte sugerido no arquivo" (sem folga, o arquivo inteiro:
   0:00 até a duração), e grava `shorts/renders.json` e `shorts/posting-kit.md`.

@@ -757,8 +757,17 @@ def main():
             def go_fast():
                 with yt_dlp.YoutubeDL(opts({"live_from_start": True})) as y:
                     return live_fast(y, url, rng, h, a.out, mp4, cfg)
-            offset, lead = run_with_login(go_fast)
-            done = True
+            try:
+                offset, lead = run_with_login(go_fast)
+                done = True
+            except Exception as e:      # plano B: o download normal do yt-dlp (mais lento, mas baixa)
+                print(f"  Download rápido falhou ({e}); usando o download normal (mais lento).", flush=True)
+                for f in os.listdir(a.out):
+                    if f.startswith(("live_a", "live_v")) or f == os.path.basename(mp4):
+                        try:
+                            os.remove(os.path.join(a.out, f))
+                        except OSError:
+                            pass
 
         # --- download normal (trecho por --section, vídeo inteiro, ou live do YouTube)
         if not done:
