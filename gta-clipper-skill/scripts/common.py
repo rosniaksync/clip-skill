@@ -157,3 +157,44 @@ def continue_from(covered, cfg):
     (no máximo 1/4 do que foi coberto, para uma live recém-começada não refazer tudo)."""
     ov = min(float(cfg.get("chunk_overlap_minutes", 5)) * 60, covered * 0.25)
     return max(0.0, covered - ov)
+
+
+def no_power_throttling():
+    """Windows: pede para o processo não ser estrangulado pelo EcoQoS (notebook na bateria). Não faz nada fora do Windows."""
+    if os.name != "nt":
+        return
+    try:
+        import ctypes
+        class PPTS(ctypes.Structure):
+            _fields_ = [("Version", ctypes.c_ulong), ("ControlMask", ctypes.c_ulong), ("StateMask", ctypes.c_ulong)]
+        st = PPTS(1, 1, 0)   # PROCESS_POWER_THROTTLING_EXECUTION_SPEED ligado no controle, desligado no estado
+        k = ctypes.windll.kernel32
+        k.SetProcessInformation(k.GetCurrentProcess(), 4, ctypes.byref(st), ctypes.sizeof(st))
+    except Exception:
+        pass
+
+
+def probe_av(path):
+    """Info do arquivo sem abrir o ffprobe (PyAV; cada ffprobe custa ~2-3 s neste PC). Plano B: ffprobe.
+    -> {"duration", "width", "height", "vcodec", "pix_fmt", "acodec"}"""
+    try:
+        import av
+        with av.open(path) as c:
+            v = next((x for x in c.streams if x.type == "video"), None)
+            a = next((x for x in c.streams if x.type == "audio"), None)
+            return {"duration": (c.duration or 0) / 1e6,
+                    "width": v.codec_context.width if v else 0, "height": v.codec_context.height if v else 0,
+                    "vcodec": v.codec_context.name if v else None,
+                    "pix_fmt": (v.codec_context.pix_fmt if v else None),
+                    "acodec": a.codec_context.name if a else None}
+    except Exception:
+        out = subprocess.run(["ffprobe", "-v", "error", "-show_entries",
+                              "format=duration:stream=codec_type,codec_name,width,height,pix_fmt", "-of", "json", path],
+                             capture_output=True, text=True).stdout
+        j = json.loads(out or "{}")
+        st = j.get("streams", [])
+        v = next((x for x in st if x.get("codec_type") == "video"), {})
+        a = next((x for x in st if x.get("codec_type") == "audio"), {})
+        return {"duration": float(j.get("format", {}).get("duration") or 0), "width": v.get("width", 0),
+                "height": v.get("height", 0), "vcodec": v.get("codec_name"), "pix_fmt": v.get("pix_fmt"),
+                "acodec": a.get("codec_name")}

@@ -46,19 +46,16 @@ e) Revisar quando o GTA 6 deixar de ser lançamento (~mar/2027).
 - **Reação emocional de verdade:** susto, grito, risada que não para, choque com a novidade.
 - **Número/absurdo concreto:** "gastou 400 mil em 2 minutos", "5 estrelas em 10 segundos".
 
-## Variedade: cortes de coisas DIFERENTES (pedido do usuário, 19/11/2026)
+## Quantidade: o máximo de shorts (pedido do usuário, 21/11/2026; substitui "1 corte por assunto")
 
-- **No máximo 1 corte por assunto por link** (ex.: um de polícia, um de mapa, um de salão — nunca dois de "mapa"
-  ou dois de "fuga"). Dois momentos do mesmo assunto: fica o melhor.
-- Num link, misture tipos: descoberta/mecânica, visual, reação/caos, opinião, primeira vez. Antes de fechar o
-  bloco, confira a lista: se dois cortes contam a mesma coisa, troque um por outro assunto que passe no teste.
-- Confira também os shorts já feitos do mesmo link (`progress.py check` e o histórico): não repita assunto entre
-  blocos. Menu/tela de mapa como payoff é fraco: só entra se for a única forma de mostrar a mecânica.
+- Corte **tudo o que se sustenta sozinho**, até o mais básico: coisa inusitada (dá bastante certo), reação,
+  descoberta, mecânica, loja/oficina, visual bonito, tiroteio, perseguição, bug, fail, zoeira com desfecho.
+- Assunto repetido pode, se for outro momento com algo diferente na tela. Só não corte o mesmo momento duas vezes
+  (`progress.py check`).
+- As prioridades acima continuam valendo para ordenar e escrever o gancho, não para descartar.
 
 ## Eliminatório (descartar sem pensar duas vezes)
 
-- Graça que depende do comentário em cima de um detalhe pequeno.
-- Roleplay ou contexto de antes na live.
 - Referência desconhecida ou só mostrada em celular/texto.
 - Bate-papo só com a webcam (sem jogo), menu/AFK/loading (exceto a abertura do jogo).
 - Música com direitos autorais alta (exceto a abertura, com aviso).
@@ -104,6 +101,13 @@ buscado no lançamento: gente que não tem o jogo quer ver "como é X no GTA 6".
   - promessa x resultado: "ELE JUROU QUE IA ANDAR NA MORAL… DUROU 10 SEGUNDOS"
   - número/absurdo específico: "PULOU DE TRAILER DE UMA PONTE QUEBRADA COM 5 MIL NO BOLSO"
   - a frase dele entre aspas, quando é forte: "\"OS CARAS TÃO DE COLETE, VIADO\""
+- **Estilo opinião / 1ª pessoa (pedido em 21/11/2026, referência @oluittv — o que mais bomba lá):** o gancho
+  soa como o próprio streamer falando ou opinando, com KKKKK quando é engraçado, em vez de descrever a cena.
+  Exemplos dele: "ELE TAVA PEDINDO KKKKKK" (128 mil curtidas), "ISSO É RIDÍCULO NO GTA 6",
+  "DESCOBRI QUE DÁ PRA FAZER ISSO DO PIOR JEITO KKKKKKK", "ESSA CAIXA É FEITA DE QUE ROCKSTAR???",
+  "ISSO REALMENTE PODERIA SER MELHOR NO GTA 6", "A BELEZA DO GTA 6 ESTÁ NOS DETALHES",
+  "DESCOBRI UM EASTER EGG NO GTA 6 ACIDENTALMENTE!". Ex.: "O BARCO DELE AFUNDOU" ->
+  "MEU BARCO AFUNDOU E EU NEM VI KKKKK". Pode ser mais longo (o card quebra em 2 linhas).
 - **Sempre 3 opções de gancho por corte**: a melhor vai no vídeo (`hook`), as outras 2 em `hook_alt`
   (lista). No Notion vão em "Outros ganchos" junto com "O que acontece" (1 frase do que se vê no vídeo), para o
   usuário trocar o gancho sem ter que assistir. Ele responde "07 → 2" e eu renderizo de novo só esse short

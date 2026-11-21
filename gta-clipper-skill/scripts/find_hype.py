@@ -54,6 +54,18 @@ def tokens(text):
 
 def audio_db_per_sec(video):
     sr = 8000
+    pcm = os.path.join(os.path.dirname(video), "audio16k.pcm")
+    if os.path.exists(pcm):            # áudio já extraído pelo transcribe.py (16 kHz int16): sem ffmpeg
+        x = np.memmap(pcm, dtype=np.int16, mode="r")[::2].astype(np.float32) / 32768.0
+        out = []
+        for k in range(0, len(x), sr):
+            c = x[k:k + sr]
+            n = len(c) // 800 * 800
+            if n == 0:
+                out.append(-90.0); continue
+            rms = np.sqrt(np.mean(c[:n].reshape(-1, 800) ** 2, axis=1) + 1e-10)
+            out.append(float(20 * np.log10(rms.max())))
+        return np.array(out)
     p = subprocess.Popen(["ffmpeg", "-v", "error", "-i", video, "-vn", "-ac", "1", "-ar", str(sr),
                           "-f", "s16le", "-"], stdout=subprocess.PIPE)
     out = []
@@ -183,6 +195,8 @@ def top_words(workdir, rng, cfg, n=15):
 
 
 def main():
+    from common import utf8_stdout
+    utf8_stdout()
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8")
     ap = argparse.ArgumentParser()

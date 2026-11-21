@@ -71,6 +71,8 @@ def write_list(dest_dir, streamer, items):
 
 
 def main():
+    from common import utf8_stdout
+    utf8_stdout()
     ap = argparse.ArgumentParser()
     ap.add_argument("workdirs", nargs="+", help="pastas work/<pasta> com shorts/renders.json")
     ap.add_argument("--streamer", help="nome da opção Streamer no Notion (ex.: coringa)")

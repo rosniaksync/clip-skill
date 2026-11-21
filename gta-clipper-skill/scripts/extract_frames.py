@@ -28,6 +28,24 @@ def grab(src, t, path, width):
     return path
 
 
+def grab_many(src, jobs, width, per_proc=24):
+    """Vários quadros por processo do ffmpeg (cada abertura do ffmpeg custa ~2-3 s neste PC: antivírus).
+    jobs = [(tempo, arquivo)]. Cada quadro é uma entrada com -ss próprio (busca rápida e exata)."""
+    def run(chunk):
+        cmd = ["ffmpeg", "-v", "error", "-nostdin", "-y"]
+        for t, _ in chunk:
+            cmd += ["-ss", f"{max(0.0, t):.2f}", "-i", src]
+        for k, (_, path) in enumerate(chunk):
+            cmd += ["-map", f"{k}:v:0", "-frames:v", "1", "-vf", f"scale={width}:-2", "-q:v", "4", path]
+        r = subprocess.run(cmd)
+        if r.returncode:                      # plano B: um por um
+            for t, path in chunk:
+                grab(src, t, path, width)
+    chunks = [jobs[i:i + per_proc] for i in range(0, len(jobs), per_proc)]
+    with ThreadPoolExecutor(max_workers=min(4, len(chunks) or 1)) as ex:
+        list(ex.map(run, chunks))
+
+
 def font(size):
     try:
         return ImageFont.truetype(os.path.join(SKILL_DIR, "fonts", "Montserrat-Black.ttf"), size)
@@ -104,8 +122,7 @@ def main():
         rows.append((f"#{cid}  {fmt_hms(s)}–{fmt_hms(e)}", [(f, fmt_hms(t)) for f, t in zip(files, times)]))
     if not rows:
         sys.exit("Nenhum candidato para extrair.")
-    with ThreadPoolExecutor(max_workers=min(8, os.cpu_count() or 4)) as ex:
-        list(ex.map(lambda j: grab(src, j[0], j[1], a.width), jobs))
+    grab_many(src, jobs, a.width)
 
     sheets = []
     for k in range(0, len(rows), a.per_sheet):

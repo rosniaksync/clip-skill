@@ -89,6 +89,8 @@ def show(hist, cfg):
 
 
 def main():
+    from common import utf8_stdout
+    utf8_stdout()
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8")
     cfg = load_config()

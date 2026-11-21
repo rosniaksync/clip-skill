@@ -392,7 +392,12 @@ def live_fast(y, url, rng, h, out, mp4, cfg):
 
     linfo = vf = af = None
     bases = {}
-    for attempt in range(4):        # o gerador do YouTube às vezes volta vazio: pergunta de novo
+    # cache curto (15 min) da lista de pedaços: vários cortes da mesma live seguidos (fetch_hd) não perguntam de novo
+    cpath = os.path.join(work_root(cfg), "_cache", "live_" + re.sub(r"[^A-Za-z0-9_-]", "_", url)[-60:] + f"_{h}.json")
+    cached = read_json(cpath)
+    if cached and time.time() - cached.get("saved", 0) < 900:
+        linfo, vf, af, bases = cached["linfo"], cached["vf"], cached["af"], cached["bases"]
+    for attempt in range(0 if bases else 4):        # o gerador do YouTube às vezes volta vazio: pergunta de novo
         linfo = y.extract_info(url, download=False)
         vf, af = _live_pick(linfo.get("formats") or [], h)
         if not vf:
@@ -405,6 +410,13 @@ def live_fast(y, url, rng, h, out, mp4, cfg):
         time.sleep(3 * (attempt + 1))
     if not bases:
         raise RuntimeError("o YouTube não mandou a lista de pedaços da live (tente de novo em alguns minutos)")
+    if not cached or cached.get("bases") != bases:
+        keep = ("format_id", "height", "ext", "target_duration")
+        os.makedirs(os.path.dirname(cpath), exist_ok=True)
+        write_json(cpath, {"saved": time.time(), "linfo": {"release_timestamp": linfo.get("release_timestamp")},
+                           "vf": {k: vf.get(k) for k in keep}, "af": {k: af.get(k) for k in keep},
+                           "bases": {k: {"url": v.get("url"), "fragment_count": v.get("fragment_count")}
+                                     for k, v in bases.items()}}, indent=None)
     fd = float(vf.get("target_duration") or af.get("target_duration") or 0)
     if not fd:
         cnt = bases["v"].get("fragment_count") or 0
@@ -449,6 +461,117 @@ def live_fast(y, url, rng, h, out, mp4, cfg):
         os.remove(p)
     print(f"✓ live baixada em {ts(time.time() - t0)}", flush=True)
     return measure_and_fix(mp4, s_sq * fd)
+
+
+# ---------------------------------------------------------------- YouTube encerrado: trecho em pedaços paralelos
+
+def _start_time(path):
+    out = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=start_time", "-of", "csv=p=0", path],
+                         capture_output=True, text=True).stdout.strip()
+    return float(out)
+
+
+def vod_fast(rinfo, rng, out, mp4, dcfg):
+    """Vídeo do YouTube já encerrado + --section: o YouTube limita cada conexão (~1 MB/s), então o trecho é
+    dividido em `vod_pieces` pedaços baixados ao mesmo tempo (vídeo e áudio separados, ffmpeg com -ss/-to na
+    entrada). Cada pedaço de vídeo começa num keyframe k_i <= pedido; o pedaço anterior é aparado até k_i
+    (sem sobra nem buraco) e o áudio é aparado no mesmo ponto. Retorna (offset_real, lead)."""
+    from concurrent.futures import ThreadPoolExecutor
+    fmts = rinfo.get("requested_formats") or []
+    if len(fmts) != 2 or not all(f.get("url") for f in fmts):
+        raise RuntimeError("formato sem vídeo e áudio separados")
+    vf, af = (fmts[0], fmts[1]) if fmts[0].get("vcodec") not in (None, "none") else (fmts[1], fmts[0])
+    s, e = rng
+    n = max(1, int(dcfg.get("vod_pieces", 8)))
+    cuts = [s + (e - s) * i / n for i in range(n)] + [e]
+    tmp = os.path.join(out, "_vod")
+    shutil.rmtree(tmp, ignore_errors=True)
+    os.makedirs(tmp)
+    t0 = time.time()
+
+    def hdr(f):
+        return "".join(f"{k}: {v}\r\n" for k, v in (f.get("http_headers") or {}).items())
+
+    def fetch(f, a0, a1, path):
+        cmd = ["ffmpeg", "-v", "error", "-nostdin", "-y", "-headers", hdr(f)]
+        if a0 > 0:
+            cmd += ["-ss", f"{a0:.3f}"]
+        cmd += ["-to", f"{a1:.3f}", "-copyts", "-i", f["url"], "-map", "0:0", "-c", "copy", path]
+        for tent in range(3):
+            if subprocess.run(cmd).returncode == 0 and os.path.exists(path):
+                return path
+            time.sleep(2 + tent * 3)
+        raise RuntimeError(f"pedaço {os.path.basename(path)} falhou")
+
+    def piece(job):
+        kind, i = job
+        f = vf if kind == "v" else af
+        a0 = cuts[i] - (0 if kind == "v" else 10)          # áudio começa antes: é aparado no keyframe do vídeo
+        a1 = cuts[i + 1] + (8 if i < n - 1 else 0) + (0 if kind == "v" else 5)
+        return fetch(f, max(0.0, a0), a1, os.path.join(tmp, f"{kind}{i:02d}.mkv"))
+
+    jobs = [(k, i) for i in range(n) for k in ("v", "a")]
+    with ThreadPoolExecutor(int(dcfg.get("vod_threads", 2 * n))) as ex:
+        list(ex.map(piece, jobs))
+    print(f"  {n} pedaços baixados em {ts(time.time() - t0)}", flush=True)
+
+    vpaths = [os.path.join(tmp, f"v{i:02d}.mkv") for i in range(n)]
+    with ThreadPoolExecutor(n) as ex:
+        ks = list(ex.map(_start_time, vpaths)) + [None]
+
+    def trim(i):
+        dst = os.path.join(tmp, f"v{i:02d}_c.mkv")
+        cmd = ["ffmpeg", "-v", "error", "-nostdin", "-y", "-i", vpaths[i]]
+        if ks[i + 1] is not None:
+            cmd += ["-t", f"{ks[i + 1] - ks[i]:.3f}"]
+        subprocess.run(cmd + ["-c", "copy", dst], check=True)
+        return dst
+
+    with ThreadPoolExecutor(n) as ex:
+        vfiles = list(ex.map(trim, range(n)))
+    lst = os.path.join(tmp, "v.txt")
+    with open(lst, "w", encoding="utf-8") as fh:
+        fh.write("".join(f"file '{p.replace(os.sep, '/')}'\n" for p in vfiles))
+    v_all = os.path.join(tmp, "v_all.mkv")
+    subprocess.run(["ffmpeg", "-v", "error", "-nostdin", "-y", "-f", "concat", "-safe", "0", "-i", lst,
+                    "-c", "copy", v_all], check=True)
+    vdur = media_duration(v_all)
+    ends = ks[1:n] + [ks[0] + vdur]
+
+    def first_pts(path):
+        out = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "a:0", "-show_entries", "packet=pts_time",
+                              "-read_intervals", "%+#1", "-of", "csv=p=0", path],
+                             capture_output=True, text=True).stdout.split()
+        return float(out[0].strip(","))
+
+    def atrim(i):
+        # áudio decodificado e cortado na amostra exata [ks[i], ends[i]] (tempo absoluto do primeiro pacote)
+        src = os.path.join(tmp, f"a{i:02d}.mkv")
+        dst = os.path.join(tmp, f"a{i:02d}.wav")
+        st = ks[i] - first_pts(src)
+        if st < -0.05:
+            raise RuntimeError(f"áudio a{i} começa depois do vídeo ({st:.2f}s)")
+        subprocess.run(["ffmpeg", "-v", "error", "-nostdin", "-y", "-i", src, "-af",
+                        f"atrim=start={max(0.0, st):.4f}:duration={ends[i] - ks[i]:.4f},asetpts=N/SR/TB",
+                        "-c:a", "pcm_s16le", dst], check=True)
+        return dst
+
+    with ThreadPoolExecutor(n) as ex:
+        afiles = list(ex.map(atrim, range(n)))
+    alst = os.path.join(tmp, "a.txt")
+    with open(alst, "w", encoding="utf-8") as fh:
+        fh.write("".join(f"file '{p.replace(os.sep, '/')}'\n" for p in afiles))
+    a_all = os.path.join(tmp, "a_all.m4a")
+    subprocess.run(["ffmpeg", "-v", "error", "-nostdin", "-y", "-f", "concat", "-safe", "0", "-i", alst,
+                    "-c:a", "aac", "-b:a", "160k", a_all], check=True)
+    adur = media_duration(a_all)
+    if abs(adur - vdur) > 1.5 or abs(vdur - (e - ks[0])) > 3:
+        raise RuntimeError(f"duração não bate (vídeo {vdur:.1f}s, áudio {adur:.1f}s, pedido {e - ks[0]:.1f}s)")
+    subprocess.run(["ffmpeg", "-v", "error", "-nostdin", "-y", "-i", v_all, "-i", a_all, "-map", "0:v:0",
+                    "-map", "1:a:0", "-c", "copy", "-movflags", "+faststart", mp4], check=True)
+    shutil.rmtree(tmp, ignore_errors=True)
+    print(f"✓ trecho baixado em {ts(time.time() - t0)} ({n} pedaços em paralelo)", flush=True)
+    return measure_and_fix(mp4, ks[0])
 
 
 # ---------------------------------------------------------------- YouTube ao vivo: só o que já passou
@@ -629,6 +752,7 @@ def main():
             print(json.dumps({"url": url, "title": info.get("title"), "uploader": info.get("uploader"),
                               "duration": info.get("duration"), "duration_string": info.get("duration_string"),
                               "is_live": is_live, "live_status": info.get("live_status"),
+                              "no_ar_ha": ts(time.time() - float(info["release_timestamp"])) if is_live and info.get("release_timestamp") else None,
                               "heatmap_points": len(heat), "extractor": info.get("extractor_key"), "id": info.get("id"),
                               "max_height": (heights(info) or [None])[-1]},
                              ensure_ascii=False))
@@ -768,6 +892,21 @@ def main():
                             os.remove(os.path.join(a.out, f))
                         except OSError:
                             pass
+
+        # --- YouTube já encerrado + trecho: pedaços em paralelo (vod_fast)
+        if rng and not done and not is_live and is_youtube(url) and dcfg.get("vod_fast", True):
+            def go_vod():
+                with yt_dlp.YoutubeDL(opts(fmt_opts)) as y:
+                    rinfo = y.process_ie_result(info_copy(info), download=False)
+                return vod_fast(rinfo, rng, a.out, mp4, dcfg)
+            try:
+                offset, lead = run_with_login(go_vod)
+                done = True
+            except Exception as e:      # plano B: download normal do yt-dlp (uma conexão, mais lento)
+                print(f"  Download em pedaços falhou ({e}); usando o download normal (mais lento).", flush=True)
+                shutil.rmtree(os.path.join(a.out, "_vod"), ignore_errors=True)
+                if os.path.exists(mp4):
+                    os.remove(mp4)
 
         # --- download normal (trecho por --section, vídeo inteiro, ou live do YouTube)
         if not done:
