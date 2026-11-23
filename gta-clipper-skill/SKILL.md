@@ -79,8 +79,9 @@ registra cada short no Notion.
   `*asteriscos*`) em **magenta #E400EE**. Gancho até ~720 px numa linha; maior que isso quebra sozinho em **2 linhas
   equilibradas** (`max_lines` 2). Todo short sai com o card (nada de `"card": false`). O card neon antigo está em
   `templates/cam_antes_label.json`.
-- **Sem zoom no rosto (21/11/2026):** o usuário testou e não gostou. O campo `"zoom"` existe no código, mas
-  não use sem pedido.
+- **Nunca zoom no rosto (21/11/2026, pedido do usuário):** a webcam nunca vai para a tela cheia nem ganha zoom. O campo
+  `"zoom"` foi desligado no código (é ignorado). Faixa preta de cena: a gameplay é ampliada sozinha (`detect_bars`);
+  tela toda preta ou menu: encurte o corte ou descarte o trecho.
 - **Webcam em tela cheia (padrão, confirmado em 18/11/2026):** a webcam enche a área de cima (1080x640). O modo
   moldura (`layout.cam_frame`, webcam menor no centro com fundo desfocado) existe no código, mas o usuário testou e
   preferiu voltar ao original. Só ligue se ele pedir.
@@ -436,6 +437,23 @@ abrir o jogo + os melhores momentos dos primeiros 30 min de jogo**, rápido, sem
    a live inteira, a abertura e esses 30 min não são repetidos (e não sai uma segunda abertura).
 7. No fim de cada link, diga em uma linha: os shorts (gancho e arquivo) e, se a live continua, "Me mande o link
    de novo (sem "abertura") quando quiser o resto, que eu continuo de HH:MM:SS".
+
+## Compilado de melhores momentos (23/11/2026)
+
+Vídeo "MELHORES MOMENTOS <STREAMER> JOGANDO GTA VI / PT N", com legenda, layout cam 1/3, sem card de gancho.
+1. **Duração ~1 min:** juntar trechos engraçados (5-20 s; briga, xingamento, grito, KKKK, nada de fala solta)
+   até o primeiro que passa um pouco de 60 s e parar ali.
+2. Um subdir por trecho em `work/<id>-compN/mK` (hardlink de source/transcript/setup do bloco) com `clips.json`
+   de 1 clipe: `"card": false`, `"compilado": true` e, nos trechos de reação, `"zoom": [[ini, fim]]` (segundos
+   do clipe, ~1-2 s). Renderizar com `make_shorts.py mK`: o zoom (webcam em tela cheia) sai da fonte,
+   **centrado no rosto** (`scripts/face_center.py`, YuNet em `assets/face_yunet.onnx`, precisa
+   `opencv-python-headless<5`), e a legenda é desenhada por cima, inteira. Nunca dar zoom no short já
+   renderizado (corta a legenda). Zoom no rosto só nos compilados.
+3. **Abertura:** o vídeo começa com o trecho mais engraçado (3-7 s); no último quadro a imagem congela pelo
+   tamanho da vinheta (`assets/sting_compilado.wav`, 2,7 s, áudio oficial do usuário) com o título por cima:
+   `python scripts/make_compilado_title.py <STREAMER> <N> title.png` (magenta #E400EE + branco, contorno preto).
+4. Reencodar todos os pedaços igual (libx264 crf 18, 30 fps, aac 48 kHz, `-video_track_timescale 15360`),
+   concat com `-c copy` e salvar em `C:\cortes\shorts\<streamer>\compilados\MELHORES MOMENTOS <STREAMER> GTA VI PT N.mp4`.
 
 ## Gameplay solo (lançamento do GTA 6, 19/11/2026) e calibração
 

@@ -21,6 +21,16 @@ e) Revisar quando o GTA 6 deixar de ser lançamento (~mar/2027).
 | "Ele treinou no GTA 6 e o jogo pediu proteína" | ruim (~45–58) | zoeira de detalhe pequeno; a graça é o comentário |
 | "O que levar pra uma mulher saindo da cadeia" | ruim (58) | roleplay de contexto, sem novidade nem payoff visual |
 | "O GTA 6 tem a lenda do macaco gambá" | ruim (45) | só um post no celular, referência desconhecida |
+| "Soltaram o monstro no GTA 6" | bom (48 curtidas, 22/11) | evento grande e visual, caos na tela, 30 s |
+| "Dá pra comprar casa no GTA 6?" | bom (21) | pergunta que quem não jogou tem, streamer responde, 20 s |
+| "Dirigir na grama no GTA 6 é diferente" | bom (21) | comparação com o GTA 5 mostrada na tela, 25 s |
+| "O melhor jogo de todos os tempos?" | bom (20) | opinião do streamer, 18 s |
+| "O monstro deu um abraço no Jason" | ruim (5) | repetiu tema já postado |
+| "Alanzoka achou o maior problema do GTA 6" | ruim (3) | reclamação |
+| "Troca de tiros com um navio desabando" | ruim (2) | só ação, sem curiosidade |
+
+f) **Gancho em forma de pergunta/curiosidade sobre o GTA 6 rende mais (22/11/2026):** "DÁ PRA ... NO GTA 6?",
+   "... É DIFERENTE DO GTA 5", "O MELHOR ...?". Gancho curto (1 linha). Corte de **18 a 30 s**. Tema repetido rende menos.
 
 ## O teste do corte bom (precisa passar nos 3)
 
