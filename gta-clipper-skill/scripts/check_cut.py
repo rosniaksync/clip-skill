@@ -190,7 +190,7 @@ def context(words, cut, before, after):
 
 def in_refined(tr, t):
     ref = tr.get("refined")
-    if ref is None:          # transcript antigo, sem registro: não dá para saber
+    if not ref:              # sem registro ou lista vazia: a passada inteira já é small (desde 19/11/2026)
         return True
     return any(a <= t <= b for a, b in ref)
 
@@ -219,8 +219,8 @@ def frames_sheet(src, rows, path, tmpdir, width):
         files = [os.path.join(tmpdir, f"c{cid}_{k}.jpg") for k in range(len(pts))]
         jobs += [(t, f) for (t, _), f in zip(pts, files)]
         srows.append((f"#{cid}  {fmt(s)} → {fmt(e)}", [(f, lab) for f, (_, lab) in zip(files, pts)]))
-    with ThreadPoolExecutor(max_workers=min(8, os.cpu_count() or 4)) as ex:
-        list(ex.map(lambda j: grab(src, j[0], j[1], width), jobs))
+    from extract_frames import grab_many
+    grab_many(src, jobs, width)
     return sheet(srows, path, width)
 
 

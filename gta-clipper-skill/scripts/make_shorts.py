@@ -48,7 +48,7 @@ FPS = 30
 
 # ---------------------------------------------------------------- helpers
 
-from common import secs  # noqa: E402
+from common import no_power_throttling, secs  # noqa: E402
 
 
 def ass_time(t):
@@ -88,7 +88,8 @@ def ffprobe(path, entries, stream=None):
 
 
 def duration(path):
-    return float(ffprobe(path, "format=duration") or 0)
+    from common import probe_av
+    return float(probe_av(path)["duration"] or 0)
 
 
 def load_template(tdir, style):
@@ -191,6 +192,124 @@ def rr_mask(w, h, rad, inset=0):
     m = Image.new("L", (w, h), 0)
     ImageDraw.Draw(m).rounded_rectangle([inset, inset, w - 1 - inset, h - 1 - inset], max(rad - inset, 0), fill=255)
     return m
+
+
+def render_label(tpl, clip, W):
+    """Etiqueta (pedido 21/11/2026): linha branca de lado a lado na divisa + retângulo branco pequeno
+    com o gancho numa linha só, texto preto e 'GTA 6' (ou *palavra*) na cor de destaque.
+    Retorna (imagem da largura do vídeo, centro_y, topo_da_etiqueta)."""
+    import re
+    c = tpl["card"]
+    lb = c["label"]
+    text = " ".join(x.strip() for x in (clip.get("hook", ""), clip.get("subhook", "")) if x and x.strip())
+    text = re.sub(r"\s+", " ", text).strip()   # emoji fica no card (pedido 21/11/2026: só de vez em quando)
+    if c.get("uppercase", True):
+        text = text.upper()
+    if not clean_text(text, False):
+        return None
+    pat = re.compile(lb.get("highlight_regex", r"GTA ?(6|VI)"), re.I)
+    parts, pos = [], 0
+    for mt in re.finditer(r"\*([^*]+)\*|" + pat.pattern, text, re.I):
+        if mt.start() > pos:
+            parts.append((text[pos:mt.start()], lb["color"]))
+        parts.append((mt.group(1) or mt.group(0), lb["highlight_color"]))
+        pos = mt.end()
+    if pos < len(text):
+        parts.append((text[pos:], lb["color"]))
+    parts = [(t.replace("*", ""), col) for t, col in parts if t]
+    # palavras com a cor de cada uma (para poder quebrar em 2 linhas sem perder o destaque)
+    words = []
+    for t, col in parts:
+        # destaque ("GTA 6") nunca quebra no meio (23/11/2026)
+        for i, w in enumerate([t] if col == lb["highlight_color"] else re.split(r"(\s+)", t)):
+            if not w:
+                continue
+            if w.isspace():
+                words.append((" ", col))
+            else:
+                for piece in re.split("(" + EMOJI_RE.pattern + "+)", w):
+                    if piece:
+                        words.append((piece, "EMOJI" if EMOJI_RE.fullmatch(piece[0]) else col))
+    fpath = resolve_font(lb["font"])
+    maxw = c.get("max_width", 1000) - 2 * lb["padding_x"]
+    max_lines = lb.get("max_lines", 1)
+
+    def efont(f):
+        return pil_font(lb.get("emoji_font", r"C:\Windows\Fonts\seguiemj.ttf"), int(f.size * 0.95))
+
+    def width(seq, f):
+        ef = efont(f) if any(col == "EMOJI" for _, col in seq) else None
+        return sum((ef if col == "EMOJI" else f).getlength(t) for t, col in seq)
+
+    def strip(seq):
+        while seq and seq[0][0] == " ":
+            seq = seq[1:]
+        while seq and seq[-1][0] == " ":
+            seq = seq[:-1]
+        return seq
+
+    def best_split(f):
+        idx = [i for i, (t, _) in enumerate(words) if t == " "]
+        best = None
+        for i in idx:
+            a, b2 = strip(words[:i]), strip(words[i + 1:])
+            m = max(width(a, f), width(b2, f))
+            if best is None or m < best[0]:
+                best = (m, [a, b2])
+        return best
+
+    size = lb["size"]
+    f = pil_font(fpath, size)
+    lines = [strip(words)]
+    if lb.get("prefer_one_line"):
+        # 22/11/2026: priorizar UMA linha — diminui a fonte até one_line_min_size antes de quebrar
+        s1 = size
+        while s1 > lb.get("one_line_min_size", 38) and width(lines[0], pil_font(fpath, s1)) > maxw:
+            s1 -= 2
+        if width(lines[0], pil_font(fpath, s1)) <= maxw:
+            size, f = s1, pil_font(fpath, s1)
+        elif max_lines >= 2 and best_split(f):
+            lines = best_split(f)[1]
+    elif width(lines[0], f) > lb.get("one_line_max", maxw) and max_lines >= 2 and best_split(f):
+        lines = best_split(f)[1]          # 2 linhas equilibradas (estilo de referência, 21/11/2026)
+    while size > lb.get("min_size", 30) and max(width(ln, f) for ln in lines) > maxw:
+        size -= 2
+        f = pil_font(fpath, size)
+        if len(lines) == 2:
+            lines = best_split(f)[1]
+    l, tp, r, b = f.getbbox("ÁGJQ")
+    th = b - tp
+    gap = lb.get("line_gap", 6)
+    tw = int(max(width(ln, f) for ln in lines))
+    text_h = th * len(lines) + gap * (len(lines) - 1)
+    bw_, bh_ = tw + 2 * lb["padding_x"], text_h + 2 * lb["padding_y"]
+    line_h = c.get("divider", {}).get("height", 0)
+    H = max(bh_, line_h) + 4
+    img = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    d = ImageDraw.Draw(img)
+    cy = H // 2
+    if line_h:
+        d.rectangle([0, cy - line_h // 2, W, cy - line_h // 2 + line_h - 1], fill=hex_rgb(c["divider"]["color"]))
+    bx, by = (W - bw_) // 2, cy - bh_ // 2
+    rad = lb.get("radius", 0)
+    if rad:
+        d.rounded_rectangle([bx, by, bx + bw_ - 1, by + bh_ - 1], rad, fill=hex_rgb(lb["bg"]))
+    else:
+        d.rectangle([bx, by, bx + bw_ - 1, by + bh_ - 1], fill=hex_rgb(lb["bg"]))
+    y = by + lb["padding_y"] - tp
+    for ln in lines:
+        x = (W - width(ln, f)) / 2
+        for t, col in ln:
+            if col == "EMOJI":
+                ef = efont(f)
+                el, et, er, eb = ef.getbbox(t)
+                d.text((x, y + tp + (th - (eb - et)) / 2 - et), t, font=ef, embedded_color=True)
+                x += ef.getlength(t)
+                continue
+            d.text((x, y), t, font=f, fill=hex_rgb(col))
+            x += f.getlength(t)
+        y += th + gap
+    return img, cy, by
 
 
 def render_card(tpl, clip, tdir, W):
@@ -611,7 +730,29 @@ def cam_box_px(cam, src_w, src_h, target_aspect):
     return bw, bh, px, py
 
 
-def filter_cam(tpl, cam, src_w, src_h, card_xy, with_card):
+def detect_bars(src_path, ss, length, src_h, min_bar=12, share=0.2):
+    """Faixas pretas de cinema (cutscene) em cima/embaixo do jogo (pedido 21/11/2026: nada de parte preta no
+    short; aumenta a gameplay). Amostra 2 quadros/s com cropdetect; se em `share` dos quadros houver faixa de
+    `min_bar` px ou mais, devolve (topo, altura) do recorte sem as faixas (a menor faixa vista, para não comer
+    jogo). Senão None."""
+    import subprocess
+    r = subprocess.run(["ffmpeg", "-hide_banner", "-ss", f"{ss:.3f}", "-t", f"{length:.3f}", "-i", src_path,
+                        "-vf", "fps=2,crop=iw*0.4:ih:iw*0.3:0,cropdetect=limit=24:round=2:reset=1", "-an", "-f", "null", "-"],
+                       capture_output=True, text=True, encoding="utf-8", errors="replace")
+    tops, n = [], 0
+    for m in re.finditer(r"crop=(\d+):(\d+):(\d+):(\d+)", r.stderr):
+        n += 1
+        h, y = int(m.group(2)), int(m.group(4))
+        bot = src_h - (y + h)
+        if min(y, bot) >= min_bar:
+            tops.append(min(y, bot))
+    if not n or len(tops) < share * n:
+        return None
+    bar = min(tops) // 2 * 2
+    return bar, (src_h - 2 * bar) // 2 * 2
+
+
+def filter_cam(tpl, cam, src_w, src_h, card_xy, with_card, zooms=None, bars=None):
     W = tpl["canvas"]["w"]
     L = tpl["layout"]
     ch, gh, fx = L["cam_height"], L["game_height"], L["game_focus_x"]
@@ -644,14 +785,32 @@ def filter_cam(tpl, cam, src_w, src_h, card_xy, with_card):
         f = (f"[0:v]split[c][g];"
              f"[c]crop={bw}:{bh}:{px}:{py},scale={W}:{ch}:force_original_aspect_ratio=increase:flags={flags},"
              f"crop={W}:{ch}{sharp}[cam];")
+    gcrop = f"crop=iw:{bars[1]}:0:{bars[0]}," if bars else ""
     f += (
-         f"[g]scale={W}:{gh}:force_original_aspect_ratio=increase:flags={flags},"
+         f"[g]{gcrop}scale={W}:{gh}:force_original_aspect_ratio=increase:flags={flags},"
          f"crop={W}:{gh}:(iw-{W})*{fx}:0[game];"
          f"[cam][game]vstack[base]")
     last = "base"
     if with_card:
         f += f";[{last}][1:v]overlay={card_xy[0]}:{card_xy[1]}[withcard]"
         last = "withcard"
+    if zooms:
+        # Zoom no rosto (estilo @oluittv, 21/11/2026): nos trechos de reação a webcam ocupa a tela inteira
+        # (recorte 9:16 do centro da caixa da webcam), sem card; a legenda continua por cima.
+        H = tpl["canvas"]["h"]
+        x, y, w, h = cam
+        zh = int(h * src_h) // 2 * 2
+        zw = int(zh * W / H) // 2 * 2
+        zy = int(min(max(y * src_h, 0), src_h - zh))
+        n = len(zooms)
+        f = f.replace("[0:v]split[c][g];", f"[0:v]split={2 + n}[c][g]" + "".join(f"[z{i}]" for i in range(n)) + ";", 1)
+        for i, z in enumerate(zooms):
+            a, b = z[0], z[1]
+            cx = z[2] if len(z) > 2 and z[2] is not None else (x + w / 2) * src_w   # sem rosto: centro da caixa
+            zx = int(min(max(cx - zw / 2, 0), src_w - zw))
+            f += (f";[z{i}]crop={zw}:{zh}:{zx}:{zy},scale={W}:{H}:flags={flags}{sharp}[zm{i}]"
+                  f";[{last}][zm{i}]overlay=0:0:enable='between(t,{a:.3f},{b:.3f})'[zoomed{i}]")
+            last = f"zoomed{i}"
     return f, last
 
 
@@ -728,8 +887,9 @@ def render(workdir, clip, words, args, setup, src_w, src_h, tdir, out_dir, cfg, 
     hd = hd_source(workdir, clip, s, e)
     if hd:
         src_path, ss = hd[0], s - hd[1]
-        wh = ffprobe(src_path, "stream=width,height", "v:0").split()[0].split(",")[:2]
-        src_w, src_h = int(wh[0]), int(wh[1])
+        from common import probe_av
+        pi = probe_av(src_path)
+        src_w, src_h = int(pi["width"]), int(pi["height"])
     elif (read_json(os.path.join(workdir, "info.json"), {}) or {}).get("analysis"):
         sys.exit(f"Corte #{clip['id']}: o bloco foi baixado leve (modo análise) e o corte ainda não tem o trecho "
                  f"em alta. Rode: python scripts/fetch_hd.py {workdir} --only {clip['id']}")
@@ -743,6 +903,11 @@ def render(workdir, clip, words, args, setup, src_w, src_h, tdir, out_dir, cfg, 
         elif style == "nocam" and "stack" in tpl:
             img, gm = render_stack(tpl, clip, tdir, W)
             overlay_xy = (0, tpl["stack"]["y_top"] - gm)
+        elif style == "cam" and "label" in tpl.get("card", {}):   # etiqueta branca na divisa (21/11/2026)
+            r = render_label(tpl, clip, W)
+            if r:
+                img, box_cy, card_margin = r
+                overlay_xy = (0, tpl["card"]["anchor_y"] - box_cy)
         elif style == "cam" or "card" in tpl:   # nocam can also use the card (logo + channel tag) instead of the white title
             r = render_card(tpl, clip, tdir, W)
             if r:
@@ -750,6 +915,8 @@ def render(workdir, clip, words, args, setup, src_w, src_h, tdir, out_dir, cfg, 
                 overlay_xy = ((W - img.width) // 2, tpl["card"]["anchor_y"] - box_cy)
         else:
             sys.exit(f"Template {style} sem 'stack' nem 'card': nada para desenhar o gancho.")
+        if clip.get("card") is False:      # pedido 20/11/2026: 1 a cada 3 shorts sai sem card nenhum
+            img = None
         if img:
             overlay_png = os.path.join(tmp, "overlay.png")
             img.save(overlay_png)
@@ -785,7 +952,9 @@ def render(workdir, clip, words, args, setup, src_w, src_h, tdir, out_dir, cfg, 
             font_path = resolve_font(cap["font"])
             fontsdir = os.path.dirname(font_path)
             family = " ".join(pil_font(font_path, 20).getname()).replace(" Regular", "")
-            if cap.get("anchor") == "above_card" and overlay_png:   # bottom of text = gap px above the card tag
+            if style == "cam" and not overlay_png:   # sem card (pedido 20/11/2026): legenda centrada na divisa streamer/gameplay
+                pos_xy, an = (cap["x"], tpl["card"]["anchor_y"]), 5
+            elif cap.get("anchor") == "above_card" and (overlay_png or card_margin):   # bottom of text = gap px above the card tag (sem card: mesmo lugar)
                 pos_xy, an = (cap["x"], overlay_xy[1] + card_margin - cap.get("gap", 5)), 2
             else:
                 pos_xy, an = (cap["x"], cap["y"]), cap.get("an", 5)
@@ -796,7 +965,20 @@ def render(workdir, clip, words, args, setup, src_w, src_h, tdir, out_dir, cfg, 
             cam = clip.get("cam") or setup.get("cam")
             if not cam:
                 sys.exit("O estilo cam precisa da caixa da webcam: rode --snapshot, estime e passe --cam x,y,w,h")
-            graph, last = filter_cam(tpl, cam, src_w, src_h, overlay_xy, bool(overlay_png))
+            # zoom no rosto removido dos shorts a pedido do usuário (21/11/2026); só os compilados usam
+            # ("compilado": true + "zoom": [[ini, fim], ...] em segundos do clipe). A legenda é desenhada
+            # depois do zoom, então fica inteira por cima (23/11/2026).
+            zooms = [tuple(z) for z in clip["zoom"]] if clip.get("compilado") and clip.get("zoom") else None
+            if zooms:   # streamer sempre no meio do zoom (23/11/2026): centro do rosto em cada trecho
+                from face_center import face_cx
+                bx, by = int(cam[0] * src_w), int(cam[1] * src_h)
+                bw_, bh_ = int(cam[2] * src_w) // 2 * 2, int(cam[3] * src_h) // 2 * 2
+                zooms = [(a, b, face_cx(src_path, ss + a, ss + b, (bx, by, bw_, bh_))) for a, b in zooms]
+                print(f"  #{clip['id']}: zoom centrado no rosto x={[None if z[2] is None else round(z[2]) for z in zooms]}")
+            bars = None if clip.get("no_bar_zoom") else detect_bars(src_path, ss, length, src_h)
+            if bars:
+                print(f"  #{clip['id']}: faixa preta de cena ({bars[0]} px) -> gameplay ampliada")
+            graph, last = filter_cam(tpl, cam, src_w, src_h, overlay_xy, bool(overlay_png), zooms, bars)
         elif style == "faixa":
             graph, last = filter_faixa(tpl)
         else:
@@ -815,11 +997,22 @@ def render(workdir, clip, words, args, setup, src_w, src_h, tdir, out_dir, cfg, 
             cmd += ["-framerate", str(FPS), "-i", "overlay.png"]
         out_name = f"{name}.mp4"
         cmd += ["-t", f"{length:.3f}", "-filter_complex", graph, "-map", "[v]", "-map", "0:a?",
-                "-c:v", "libx264", "-profile:v", "high", "-pix_fmt", "yuv420p", "-preset", str(ENC.get("preset", "veryfast")),
-                "-crf", str(ENC.get("crf", 20)), "-r", str(FPS),
+                "__VENC__", "-r", str(FPS),
                 "-af", "loudnorm=I=-14:TP=-1.5:LRA=11", "-c:a", "aac", "-b:a", "160k", "-ar", "48000", "-ac", "2",
                 "-movflags", "+faststart", os.path.abspath(os.path.join(out_dir, out_name))]
-        subprocess.run(cmd, check=True, cwd=tmp)
+        x264 = ["-c:v", "libx264", "-profile:v", "high", "-pix_fmt", "yuv420p", "-preset", str(ENC.get("preset", "veryfast")),
+                "-crf", str(ENC.get("crf", 20))]
+        hw = ENC.get("hw_encoder")   # ex.: h264_qsv (placa Intel): ~2x mais rápido; se falhar, volta pro libx264
+        i = cmd.index("__VENC__")
+        if hw:
+            hwargs = ["-c:v", hw, "-profile:v", "high", "-preset", str(ENC.get("hw_preset", "veryfast")),
+                      "-global_quality", str(ENC.get("hw_quality", 20))]
+            r = subprocess.run(cmd[:i] + hwargs + cmd[i + 1:], cwd=tmp)
+            if r.returncode != 0:
+                print(f"  aviso: {hw} falhou, usando libx264", flush=True)
+                subprocess.run(cmd[:i] + x264 + cmd[i + 1:], check=True, cwd=tmp)
+        else:
+            subprocess.run(cmd[:i] + x264 + cmd[i + 1:], check=True, cwd=tmp)
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 
@@ -829,12 +1022,10 @@ def render(workdir, clip, words, args, setup, src_w, src_h, tdir, out_dir, cfg, 
 
 
 def verify(path):
-    def probe(stream):
-        out = subprocess.run(["ffprobe", "-v", "error", "-select_streams", stream, "-show_entries",
-                              "stream=codec_name,pix_fmt", "-of", "default=nw=1", path],
-                             capture_output=True, text=True).stdout
-        return dict(l.split("=", 1) for l in out.split() if "=" in l)
-    v, a = probe("v:0"), probe("a:0")
+    from common import probe_av
+    pi = probe_av(path)
+    v = {"codec_name": pi["vcodec"], "pix_fmt": pi["pix_fmt"]}
+    a = {"codec_name": pi["acodec"]} if pi["acodec"] else {}
     if v.get("codec_name") != "h264" or v.get("pix_fmt") != "yuv420p" or (a and a.get("codec_name") != "aac"):
         sys.exit(f"Conferência da saída falhou em {path}: vídeo={v} áudio={a} (precisa h264/yuv420p/aac)")
 
@@ -844,19 +1035,26 @@ def verify(path):
 def snapshot(workdir, source, cam):
     d = duration(source)
     fracs = (0.08, 0.22, 0.38, 0.54, 0.70, 0.86)
-    paths = []
-    for i, fr in enumerate(fracs, 1):
-        p = os.path.join(workdir, f"snapshot_{i}.jpg")
-        vf = "scale=1280:-2"
-        if cam:
-            x, y, w, h = cam
-            vf += f",drawbox=x=iw*{x}:y=ih*{y}:w=iw*{w}:h=ih*{h}:color=red@0.9:t=4"
-        subprocess.run(["ffmpeg", "-v", "error", "-y", "-ss", f"{d * fr:.1f}", "-i", source,
-                        "-frames:v", "1", "-vf", vf, p], check=True)
-        paths.append(p)
+    vf = "scale=1280:-2"
+    if cam:
+        x, y, w, h = cam
+        vf += f",drawbox=x=iw*{x}:y=ih*{y}:w=iw*{w}:h=ih*{h}:color=red@0.9:t=4"
+    cmd = ["ffmpeg", "-v", "error", "-nostdin", "-y"]       # um processo só para os 6 quadros
+    for fr in fracs:
+        cmd += ["-ss", f"{d * fr:.1f}", "-i", source]
+    for i in range(len(fracs)):
+        cmd += ["-map", f"{i}:v:0", "-frames:v", "1", "-vf", vf, os.path.join(workdir, f"snapshot_{i + 1}.jpg")]
+    subprocess.run(cmd, check=True)
     sheet = os.path.join(workdir, "snapshot.jpg")
-    subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", os.path.join(workdir, "snapshot_%d.jpg"),
-                    "-vf", "scale=640:-2,tile=3x2:padding=4:color=black", "-frames:v", "1", sheet], check=True)
+    from PIL import Image as _I
+    ims = [_I.open(os.path.join(workdir, f"snapshot_{i + 1}.jpg")).convert("RGB") for i in range(len(fracs))]
+    tw = 640
+    ims = [im.resize((tw, int(im.height * tw / im.width))) for im in ims]
+    th = max(im.height for im in ims)
+    canvas = _I.new("RGB", (3 * tw + 8, 2 * th + 4), "black")
+    for k, im in enumerate(ims):
+        canvas.paste(im, ((k % 3) * (tw + 4), (k // 3) * (th + 4)))
+    canvas.save(sheet, quality=90)
     print(f"✓ {sheet}  (+ snapshot_1..6.jpg em tamanho cheio{', caixa da webcam em vermelho' if cam else ''})")
     print("  Procure: (1) webcam sobre o jogo, (2) legenda gravada na imagem.")
 
@@ -991,6 +1189,9 @@ def write_posting_kit(wd, out_dir, clips, cfg):
 # ---------------------------------------------------------------- main
 
 def main():
+    from common import utf8_stdout
+    utf8_stdout()
+    no_power_throttling()
     if hasattr(sys.stdout, 'reconfigure'):
         sys.stdout.reconfigure(encoding='utf-8')
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -1018,6 +1219,15 @@ def main():
 
     setup_path = os.path.join(wd, "setup.json")
     setup = json.load(open(setup_path, encoding="utf-8")) if os.path.exists(setup_path) else {}
+    if not setup:      # bloco seguinte da mesma live (work/<id>-b2...): mesma caixa da webcam do bloco anterior
+        import re as _re
+        base = _re.sub(r"-b\d+$", "", os.path.basename(os.path.normpath(wd)))
+        for sib in sorted(glob.glob(os.path.join(os.path.dirname(os.path.normpath(wd)), base + "-b*", "setup.json"))):
+            if os.path.normpath(os.path.dirname(sib)) != os.path.normpath(wd):
+                setup = json.load(open(sib, encoding="utf-8"))
+                json.dump(setup, open(setup_path, "w", encoding="utf-8"), indent=2)
+                print(f"  webcam do bloco anterior: {setup.get('cam')}")
+                break
     if args.cam:
         setup["cam"] = [float(v) for v in args.cam.split(",")]
         if len(setup["cam"]) != 4:
@@ -1051,7 +1261,9 @@ def main():
             sys.exit(f"Corte #{args.export_captions} não está no clips.json")
         return export_captions(wd, c, words, cfg, src_dur, args.template_dir)
 
-    sw, sh = ffprobe(args.source, "stream=width,height", "v:0").split()[0].split(",")[:2]
+    from common import probe_av
+    _pi = probe_av(args.source)
+    sw, sh = _pi["width"], _pi["height"]
     src_w, src_h = int(sw), int(sh)
     os.makedirs(out_dir, exist_ok=True)
 

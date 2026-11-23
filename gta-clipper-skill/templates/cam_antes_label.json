@@ -1,0 +1,125 @@
+{
+  "name": "cam",
+  "description": "Neon synthwave RSK CORTES (logo oficial, tons de sol: azul, roxo, rosa, coral). Backup: cam_gta6_loucuras.json | 18/11/2026: 1/3 streamer (640) e 2/3 gameplay (1280), pedido do usuário",
+  "canvas": {
+    "w": 1080,
+    "h": 1920
+  },
+  "channel_name": "RSK CORTES",
+  "layout": {
+    "cam_height": 640,
+    "game_height": 1280,
+    "game_focus_x": 0.5,
+    "scale_flags": "lanczos",
+    "cam_sharpen": "unsharp=5:5:0.7:3:3:0.0"
+  },
+  "card": {
+    "anchor_y": 640,
+    "max_width": 1000,
+    "uppercase": true,
+    "tag": {
+      "font": {
+        "file": "fonts/Montserrat-Black.ttf"
+      },
+      "size": 30,
+      "uppercase": true,
+      "color": "#FF4FD8",
+      "bg": "#0A0014",
+      "padding_x": 24,
+      "padding_y": 8,
+      "overlap": 12,
+      "align": "center",
+      "offset_x": 0,
+      "position": "bottom",
+      "border_color": "#FF3DCB",
+      "border_width": 3,
+      "bg_gradient": [
+        "#14003A",
+        "#050008"
+      ],
+      "border_gradient": [
+        "#5B3CFF",
+        "#C02BE8",
+        "#FF3DCB",
+        "#FF6F91"
+      ]
+    },
+    "box": {
+      "bg": "#0A0014",
+      "border_color": "#FF3DCB",
+      "border_width": 5,
+      "radius": 26,
+      "padding_x": 30,
+      "padding_y": 14,
+      "line_gap": 4,
+      "bg_gradient": [
+        "#14003A",
+        "#050008"
+      ],
+      "bg_image": {
+        "file": "assets/logo.png",
+        "blur": 10,
+        "opacity": 0.12
+      },
+      "border_gradient": [
+        "#5B3CFF",
+        "#C02BE8",
+        "#FF3DCB",
+        "#FF6F91"
+      ],
+      "glow": {
+        "radius": 9,
+        "opacity": 0.8
+      },
+      "fixed_w": 1000,
+      "fixed_h": 168
+    },
+    "line1": {
+      "font": {
+        "file": "fonts/Montserrat-Black.ttf"
+      },
+      "size": 48,
+      "min_size": 33,
+      "color": "#FF4FD8"
+    },
+    "line2": {
+      "font": {
+        "file": "fonts/Montserrat-Black.ttf"
+      },
+      "size": 60,
+      "min_size": 36,
+      "color": "#FFD7E8"
+    },
+    "logo": {
+      "file": "assets/logo.png",
+      "circle": true,
+      "pad": 0.18,
+      "size": 134,
+      "gap": 18
+    },
+    "text_glow": {
+      "radius": 10,
+      "opacity": 0.7
+    }
+  },
+  "captions": {
+    "font": {
+      "file": "fonts/Poppins-ExtraBold.ttf"
+    },
+    "bold": false,
+    "size": 69,
+    "uppercase": true,
+    "color": "#FFFFFF",
+    "highlight_color": "#FE5CCD",
+    "highlight_scale": 112,
+    "outline": 4,
+    "outline_color": "#000000",
+    "shadow": 1,
+    "x": 540,
+    "max_words": 3,
+    "max_chars": 16,
+    "max_gap": 0.6,
+    "anchor": "above_card",
+    "gap": 30
+  }
+}

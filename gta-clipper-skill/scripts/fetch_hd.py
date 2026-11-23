@@ -33,7 +33,13 @@ class Blocked(Exception):
 
 
 def audio(path, start, dur):
-    """mono 8 kHz float32 de [start, start+dur] do arquivo."""
+    """mono 8 kHz float32 de [start, start+dur] do arquivo. Se for o source.mp4 de um bloco já transcrito,
+    lê o audio16k.pcm do transcribe.py (sem abrir o ffmpeg)."""
+    pcm = os.path.join(os.path.dirname(path), "audio16k.pcm")
+    if os.path.basename(path) == "source.mp4" and os.path.exists(pcm):
+        m = np.memmap(pcm, dtype=np.int16, mode="r")
+        a, b = int(max(0.0, start) * 16000), int((max(0.0, start) + dur) * 16000)
+        return (np.asarray(m[a:b:2], dtype=np.float32) / 32768.0)
     out = subprocess.run(["ffmpeg", "-v", "error", "-nostdin", "-ss", f"{max(0.0, start):.3f}", "-i", path,
                           "-t", f"{dur:.3f}", "-vn", "-ac", "1", "-ar", str(SR), "-f", "f32le", "-"],
                          capture_output=True).stdout
@@ -118,10 +124,9 @@ def fetch_one(wd, c, cfg, force=False):
         shift = shift2
     else:
         note = f"⚠ conferência pelo áudio fraca (conf {conf:.2f}); usando o início medido"
-    hgt = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=height",
-                          "-of", "csv=p=0", hd], capture_output=True, text=True).stdout.strip()
-    dur = float(subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", hd],
-                               capture_output=True, text=True).stdout.strip() or 0)
+    from common import probe_av
+    _pi = probe_av(hd)
+    hgt, dur = _pi["height"], float(_pi["duration"] or 0)
     r = {"file": os.path.abspath(hd), "shift": round(shift, 3), "height": int(hgt or 0),
          "covers": [round(shift, 3), round(shift + dur, 3)], "audio_conf": round(conf, 2)}
     with _lock:
@@ -136,6 +141,9 @@ def fetch_one(wd, c, cfg, force=False):
 def fetch_iter(wd, clips, cfg, jobs=None, force=False):
     """Baixa os cortes em paralelo e devolve (corte, registro_ou_None, texto) conforme cada um termina."""
     jobs = jobs or int(cfg.get("download", {}).get("hd_parallel", 3))
+    info = read_json(os.path.join(wd, "info.json"), {}) or {}
+    if info.get("is_live") and "youtube" in (info.get("extractor_key") or info.get("webpage_url") or "").lower():
+        jobs = 1        # live do YouTube no ar: cada corte já pede 16 pedaços juntos; 3 cortes juntos = 48 e o YouTube freia (10 min x 45 s)
     with ThreadPoolExecutor(max_workers=max(1, jobs)) as ex:
         futs = {ex.submit(fetch_one, wd, c, cfg, force): c for c in clips}
         for f in as_completed(futs):

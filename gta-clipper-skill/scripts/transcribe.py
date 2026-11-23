@@ -2,7 +2,7 @@
 """Transcreve com tempo por palavra (faster-whisper). Idioma detectado automaticamente.
 
 Uso:
-  transcribe.py work/<id>/source.mp4                                  # vídeo inteiro (transcribe_fast: tiny)
+  transcribe.py work/<id>/source.mp4                                  # vídeo inteiro (transcribe_fast: small)
   transcribe.py work/<id>/source.mp4 --candidates work/<id>/cands.json   # só os candidatos (transcribe_refine: small)
   transcribe.py work/<id>/source.mp4 --range 00:12:00-00:13:10        # só esses trechos (pode repetir)
   transcribe.py work/<id>/source.mp4 --detect-only                    # só detecta o idioma (lang.json)
@@ -31,7 +31,7 @@ from collections import Counter, defaultdict
 
 import numpy as np
 
-from common import load_config, read_json, secs, ts, utf8_stdout, write_json
+from common import load_config, no_power_throttling, read_json, secs, ts, utf8_stdout, write_json
 
 SR = 16000
 
@@ -78,8 +78,11 @@ class Models:
     def get(self, name):
         if name not in self.cache:
             from faster_whisper import WhisperModel
-            self.cache[name] = WhisperModel(name, device=self.device, compute_type=self.ctype,
-                                            cpu_threads=self.threads if self.device == "cpu" else 0)
+            kw = dict(device=self.device, compute_type=self.ctype, cpu_threads=self.threads if self.device == "cpu" else 0)
+            try:                      # modelo já baixado: não consulta a internet (~1,5 s por modelo)
+                self.cache[name] = WhisperModel(name, local_files_only=True, **kw)
+            except Exception:
+                self.cache[name] = WhisperModel(name, **kw)
         return self.cache[name]
 
 
@@ -138,6 +141,14 @@ def get_language(audio, workdir, cfg, models, forced=None):
     saved = read_json(lpath)
     if saved and saved.get("language"):
         return saved["language"], False
+    # bloco seguinte da mesma live (work/<id>-b2, -b3...): reaproveita o idioma do bloco anterior
+    import glob, re as _re
+    base = _re.sub(r"-b\d+$", "", os.path.basename(os.path.normpath(workdir)))
+    for sib in sorted(glob.glob(os.path.join(os.path.dirname(os.path.normpath(workdir)), base + "-b*", "lang.json"))):
+        prev = read_json(sib)
+        if prev and prev.get("language") and os.path.normpath(os.path.dirname(sib)) != os.path.normpath(workdir):
+            write_json(lpath, {**prev, "source": "bloco anterior"})
+            return prev["language"], False
     lang, samples = detect_language(audio, cfg, models)
     write_json(lpath, {"language": lang, "source": "auto", "model": cfg.get("language_detect", {}).get("model", "tiny"),
                        "samples": samples})
@@ -190,6 +201,12 @@ def to_rows(segs, offset):
     return segments, words
 
 
+def progress(msg, t0):
+    """Linha de progresso com o tempo decorrido; flush para aparecer no log na hora."""
+    el = time.time() - t0
+    print(f"… {msg} ({int(el // 60)} min {int(el % 60):02d} s)", flush=True)
+
+
 def run_pass(model, audio, lang, beam, batched, batch_size, offset, collapse, ngram=0, redo_loops=True, cr_max=2.4):
     """Transcreve um trecho (array 16 kHz) -> (segments, words, n_refeitos) em tempo do arquivo.
     Lote = rápido, mas sem o 'fallback' de temperatura do modo antigo. Contra laço (frase repetida):
@@ -203,14 +220,26 @@ def run_pass(model, audio, lang, beam, batched, batch_size, offset, collapse, ng
             no_repeat_ngram_size=ngram)
     else:
         segs, _ = model.transcribe(audio, language=lang, word_timestamps=True, vad_filter=True, beam_size=beam)
-    segs = list(segs)
+    t0, total_min, step, segs_l = time.time(), len(audio) / SR / 60, 5.0, []
+    next_mark = step
+    for s in segs:                        # progresso a cada 5 min de áudio (o log fica vivo)
+        segs_l.append(s)
+        if s.end / 60 >= next_mark:
+            progress(f"transcrição {s.end / 60:.0f}/{total_min:.0f} min", t0)
+            next_mark = (s.end / 60 // step + 1) * step
+    segs = segs_l
+    progress(f"transcrição {total_min:.0f}/{total_min:.0f} min (passada principal pronta)", t0)
     redo = 0
     if batched and redo_loops:
         bad = [s for s in segs if (s.compression_ratio or 0) > cr_max or repeats(s.text.split())]
         regions = merge_ranges([[max(0.0, s.start - 0.2), s.end + 0.2] for s in bad])
         good = [s for s in segs if s not in bad]
         segments, words = to_rows(good, offset)
-        for ra, rb in regions:
+        if regions:
+            progress(f"refazendo {len(regions)} trecho(s) em laço", t0)
+        for i, (ra, rb) in enumerate(regions, 1):
+            if i % 10 == 0:
+                progress(f"  laço {i}/{len(regions)}", t0)
             sub, _ = model.transcribe(audio[int(ra * SR):int(rb * SR)], language=lang, word_timestamps=True,
                                       vad_filter=True, beam_size=beam)
             s2, w2 = to_rows(list(sub), offset + ra)
@@ -227,7 +256,11 @@ def run_pass(model, audio, lang, beam, batched, batch_size, offset, collapse, ng
         dur = len(audio) / SR
         edges = [offset] + [x for w in words for x in (w["s"], w["e"])] + [offset + dur]
         holes = [(edges[i], edges[i + 1]) for i in range(0, len(edges) - 1, 2) if edges[i + 1] - edges[i] > 12]
-        for ha, hb in holes:
+        if holes:
+            progress(f"preenchendo {len(holes)} buraco(s) sem fala (> 12 s)", t0)
+        for i, (ha, hb) in enumerate(holes, 1):
+            if i % 10 == 0:
+                progress(f"  buraco {i}/{len(holes)}", t0)
             ra, rb = max(0.0, ha - offset), min(dur, hb - offset)
             sub, _ = model.transcribe(audio[int(ra * SR):int(rb * SR)], language=lang, word_timestamps=True,
                                       vad_filter=True, beam_size=beam, temperature=0.0,
@@ -251,6 +284,7 @@ def run_pass(model, audio, lang, beam, batched, batch_size, offset, collapse, ng
 
 def main():
     utf8_stdout()
+    no_power_throttling()
     cfg = load_config()
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("video")
@@ -323,6 +357,8 @@ def main():
         words = [w for w in old["words"] if outside(w)] + words
         segments = [x for x in old["segments"] if outside(x)] + segments
         refined = old.get("refined") or []
+    if not refine and model_name != "tiny":   # passada inteira já é small: tudo conta como refinado (check_cut)
+        refined = [[0.0, round(total, 2)]]
     if refine:
         refined = merge_ranges([list(r) for r in refined] + [[round(rs, 2), round(re_, 2)] for rs, re_ in ranges])
     words.sort(key=lambda w: w["s"])

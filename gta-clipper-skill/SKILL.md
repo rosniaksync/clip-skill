@@ -30,27 +30,17 @@ registra cada short no Notion.
   o arquivo ganha `pad_folga` (10 s) antes e depois, e o kit mostra onde o corte fica (ex.: 0:10 a 0:38).
 - **Recuo antes do pico:** `pre_roll_seconds` (15 s): a reação vem depois do fato. Depois apare para a primeira
   frase/ação forte (gancho primeiro).
-- **O tempo que o usuário pedir, dividido em quantos blocos ele pedir** (perguntas a cada link, ver passo −1;
-  `ask_duration_each_link`, `ask_blocks_each_link`). O ponto de partida é sempre o começo do vídeo ou, se o link
-  tiver histórico, o "Continuar de". A partir dele o usuário diz quanto tempo cortar (ex.: "1 hora" = do ponto
-  de partida até 1 h depois; "tudo" = até o fim / até agora na live no ar). O que não for cortado agora fica para
-  a próxima vez que ele mandar o link (o histórico só marca como feito o que foi cortado).
-  - O trecho a cortar (duração D) é dividido em **K blocos iguais** (K = resposta do usuário): cada bloco tem
-    D/K. Ex.: 44 min em 2 blocos → 2 blocos de 22 min (00:00:00–00:22:00 e 00:22:00–00:44:00). 1 bloco = o vídeo
-    inteiro, baixado sem `--section`.
-  - Para não perder um momento que caia bem na divisa, o download do bloco N (N > 1) começa
-    `chunk_overlap_minutes` (5 min) antes do início dele, limitado a um quarto do tamanho do bloco; os cortes
-    repetidos nessa sobra são descartados (`progress.py check`). Para o usuário, os blocos continuam sendo os
-    trechos iguais (ex.: 22 + 22 min).
-  - Se a divisão der um tempo quebrado, arredonde o fim de cada bloco para o minuto inteiro mais próximo; o
-    último bloco sempre termina no fim do vídeo.
-- **Quantos shorts: o usuário diz, a cada link.** Antes de começar qualquer vídeo/live, pergunte com
-  `AskUserQuestion`: "Quantos reels você quer por bloco?" (opções: até 3, até 5, só o melhor, ou outro
-  número). A resposta vale para aquele link inteiro (todos os blocos) e vira o teto N do bloco. N é um **teto**,
-  não uma meta: entregue só cortes **realmente bons** pelas regras de `references/viral-rules.md`; bloco fraco
-  entrega menos que N, ou nenhum. Nunca complete número com corte fraco. Passou de N bons: fique com os N de
-  maior `score` e renderize só esses. Achou os melhores, renderiza e encerra o bloco.
-  Não guarde a resposta como padrão: no link seguinte, pergunte de novo (`ask_reels_each_link` no config).
+- **Sem perguntas, o mais rápido possível, em blocos de 1 hora (pedido do usuário em 21/11/2026; substitui as 3
+  perguntas).** Mandou o link: `--probe` e já começa. Corta tudo o que falta, do começo (ou do "Continuar de", se o
+  link tiver histórico) até o fim do vídeo (live no ar: até agora), em blocos de `block_minutes` (60 min). O último
+  bloco termina no fim do vídeo. `ask_duration_each_link`, `ask_blocks_each_link` e `ask_reels_each_link` = false.
+  - Para não perder um momento na divisa, o download do bloco N (N > 1) começa `chunk_overlap_minutes` (5 min)
+    antes; os cortes repetidos nessa sobra são descartados (`progress.py check`).
+  - Se o usuário mandar um tempo junto com o link ("corta de 2h até 3h"), corte só esse trecho, em blocos de 1 h.
+- **Quantos shorts: o máximo que o bloco der (pedido em 21/11/2026).** Todo tipo de corte vale, até o mais básico:
+  coisa inusitada, reação, descoberta, visual bonito, mecânica nova, loja/oficina, tiroteio, perseguição, bug, fail,
+  zoeira. Sem teto por bloco. Só fica de fora o que não se sustenta sozinho (nada acontece na tela, fala solta sem
+  contexto, menu/loading, conversa com o chat). Assunto repetido no mesmo bloco pode, se o momento for outro.
 - **Bloco por bloco, sem esperar o usuário** (`auto_next_block`): termine o bloco 1 (passos 1 a 7), mostre a
   lista do bloco e siga sozinho para o próximo, até o fim do vídeo. **Um bloco por vez, foco total (pedido do
   usuário em 18/11/2026):** não baixe nem transcreva o próximo bloco enquanto o atual não terminar (passo 6b). Bloco sem momento bom entrega menos cortes. Avise em uma linha a cada bloco pronto.
@@ -76,33 +66,30 @@ registra cada short no Notion.
 ## Identidade visual (não mexer sem o usuário pedir)
 
 - **Estilo padrão = `cam`** (pedido em 19/11/2026, todos os links): webcam em cima com 1/3 da altura (640 px) e
-  gameplay embaixo com 2/3 (1280 px), card centrado na divisão. Vídeo sem webcam: `nocam`. O estilo `faixa`
+  gameplay embaixo com 2/3 (1280 px), linha branca na divisão com a etiqueta do gancho em cima. Vídeo sem webcam: `nocam`. O estilo `faixa`
   (`templates/faixa.json`, fundo neon com a tela da live inteira numa faixa no meio) existe, mas só se o usuário pedir.
 
 - **Logo oficial "RSK CORTES"** (`assets/logo.png`). No card entra redonda (`circle: true`) com margem preta
   (`pad` 0.18, tamanho 134), para a arte aparecer inteira.
 - **Fontes** (em `fonts/`): Montserrat Black (gancho, etiqueta, título do `nocam`) e Poppins ExtraBold
   (legenda). Aprovadas pelo usuário.
-- **`templates/cam.json` = "RSK CORTES, cores da logo"**: caixa escura em degradê, borda neon azul (#4B5BFF) →
-  roxo (#C02BE8) → rosa (#FF3DCB) → laranja (#FF9A3C) com brilho, logo à esquerda, texto rosa neon (#FF4FD8),
-  etiqueta do canal embaixo.
-- **Card = UMA frase só.** O texto do card é uma frase única (o `hook`), quebrada automaticamente em até 2 linhas
-  balanceadas, com **o mesmo tamanho e a mesma cor nas duas linhas**. Nunca duas frases diferentes, uma por linha
-  (o `subhook` antigo, se existir, é emendado ao `hook` como continuação da mesma frase).
-- **Tamanho do card (aprovado em 17/11/2026):** caixa de 168 px de altura (logo 134, `padding_y` 14,
-  `line_gap` 4) e fonte do gancho 48 (mínimo 33). As duas linhas usam sempre o mesmo tamanho (o menor que
-  coube); a largura da caixa acompanha o texto.
-- **Etiqueta "RSK CORTES" na mesma cor do card:** fundo escuro em degradê (#14003A → #050008), borda neon em degradê
-  (azul → roxo → rosa → laranja) e texto rosa neon (#FF4FD8), igual à caixa do card (`templates/cam.json`, `card.tag`).
-- **Nome do canal** (`channel_name`): **RSK CORTES**.
+- **Card "etiqueta" do `cam` (pedido em 21/11/2026, estilo de referência @oluittv; `templates/cam.json` →
+  `card.label` + `card.divider`):** linha branca de lado a lado na divisa (y=640, 10 px) e, centrado nela, um
+  retângulo branco com o gancho em preto (Montserrat Black 46, mínimo 30), com "GTA 6" (ou palavra entre
+  `*asteriscos*`) em **magenta #E400EE**. Gancho até ~720 px numa linha; maior que isso quebra sozinho em **2 linhas
+  equilibradas** (`max_lines` 2). Todo short sai com o card (nada de `"card": false`). O card neon antigo está em
+  `templates/cam_antes_label.json`.
+- **Nunca zoom no rosto (21/11/2026, pedido do usuário):** a webcam nunca vai para a tela cheia nem ganha zoom. O campo
+  `"zoom"` foi desligado no código (é ignorado). Faixa preta de cena: a gameplay é ampliada sozinha (`detect_bars`);
+  tela toda preta ou menu: encurte o corte ou descarte o trecho.
 - **Webcam em tela cheia (padrão, confirmado em 18/11/2026):** a webcam enche a área de cima (1080x640). O modo
   moldura (`layout.cam_frame`, webcam menor no centro com fundo desfocado) existe no código, mas o usuário testou e
   preferiu voltar ao original. Só ligue se ele pedir.
-- **Legenda do `cam`:** tamanho 69, palavra em destaque rosa (#FE5CCD), `gap` 30 px acima do card
-  (`captions.anchor: "above_card"`). Nunca duas legendas ao mesmo tempo.
-- **Saída:** H.264 / yuv420p / 30 fps / AAC; o script confere cada arquivo e falha se não bater.
+- **Legenda do `cam`:** pequena (tamanho 52, contorno 3), palavra em destaque rosa (#FE5CCD), `gap` 22 px acima da
+  etiqueta, na tela do streamer (`captions.anchor: "above_card"`). Nunca duas legendas ao mesmo tempo.
+- **Saída:** H.264 / yuv420p / 30 fps / AAC, `encode` veryfast crf 16 (21/11/2026, velocidade); o script confere cada arquivo e falha se não bater.
 
-## Passo -1 — Receber o link, ver se está ao vivo e fazer as 3 perguntas
+## Passo -1 — Receber o link e começar (sem perguntas)
 
 Não comece a baixar. Primeiro olhe o vídeo sem baixar:
 ```
@@ -127,29 +114,11 @@ mesmo id, então mandar o link de novo continua de onde parou. Detalhes: `python
 - Nos dois casos, ao terminar o que já passou, diga em uma linha: "A live continua. Me mande o link de novo
   depois que eu continuo de HH:MM:SS, sem repetir" (o histórico guarda onde parou).
 
-**Três perguntas por link (de volta a pedido do usuário em 19/11/2026, à noite; vale também para live no ar) (vídeo ou live), em duas rodadas, logo depois do `--probe` e antes de baixar** (exceto no **modo abertura**, que não pergunta nada; ver a seção dele):
-
-Rodada 1, sozinha (o tamanho dos blocos depende dela):
-1. **"Quanto tempo você quer que eu corte?"** Diga na pergunta quanto o vídeo/live tem e de onde começo, ex.:
-   "A live tem 2:00:00. Quanto tempo você quer que eu corte, a partir do começo?" ou, com histórico, "A live
-   tem 2:00:00 e já cortei até 0:45:00. Quanto tempo você quer que eu corte a partir de 0:45:00 (falta
-   1:15:00)?". Opções: "Tudo (<o que falta>)" e 2 ou 3 tempos redondos menores que façam sentido (ex.: "1 hora",
-   "30 minutos"); o usuário pode digitar outro tempo.
-
-Rodada 2, as duas juntas num único `AskUserQuestion` (calculadas sobre o tempo escolhido):
-2. **"Quantos blocos você quer que eu separe?"** Mostre o tempo escolhido e, em cada opção, o tamanho que cada
-   bloco teria (ex.: para 44 min: "1 bloco (44 min)", "2 blocos (22 min cada)", "3 blocos (~15 min cada)"; o
-   usuário pode digitar outro número).
-3. **"Quantos reels você quer por bloco?"** (ver "Quantos shorts").
-
-Espere as respostas. Elas valem só para aquele link; no link seguinte (ou quando mandar o mesmo link de novo),
-pergunte de novo. Fora essas, **não faça perguntas.**
-Se o vídeo inteiro já foi cortado e não está mais ao vivo, não pergunte nada: diga isso e pare.
-Também não pergunte sobre permissão de repostagem (o usuário já disse que tem), nome do canal, card, webcam,
-idioma, modelo, cores. Depois das respostas, diga em uma ou duas linhas: o resumo do vídeo (título, canal,
-duração), o trecho escolhido, os blocos com os horários (ex.: "2 blocos: 0:00–22:00 e 22:00–44:00") e quanto
-deve demorar. Depois comece. No fim do último bloco, se sobrou vídeo sem cortar (por escolha do usuário ou porque
-a live continua), diga em uma linha de onde continuo na próxima vez.
+**Sem perguntas (pedido do usuário em 21/11/2026).** Depois do `--probe`, diga em uma ou duas linhas: título,
+canal, duração (ou "no ar há X"), de onde começo e os blocos de 1 h com os horários (ex.: "3 blocos: 0:00–1:00,
+1:00–2:00, 2:00–2:35") e comece na hora. Não pergunte tempo, blocos, quantidade, permissão, canal, card, webcam,
+idioma, modelo nem cores. Se o vídeo inteiro já foi cortado e não está mais ao vivo, diga isso e pare.
+No fim do último bloco, se a live continua, diga em uma linha de onde continuo na próxima vez.
 
 ## Passo 0 — Conferir instalação (primeira vez ou PC novo)
 
@@ -180,7 +149,10 @@ vídeo não tiver nada de 1080p para cima, e aí avise o usuário que a fonte é
 python scripts/transcribe.py work/<id>/source.mp4
 ```
 Detecta o idioma na primeira vez (`lang.json`) e transcreve tudo com `transcribe_fast` = **small, beam 1**
-(~2,4 min por 30 min de live; o tiny saía ilegível). Não existe mais retranscrição dos candidatos.
+(8 threads, `transcribe.cpu_threads`). Na tomada: ~4–5 min por 25 min de live (~10 min por bloco de 1 h); **na
+bateria o notebook estrangula e fica 2–2,5x mais lento** (se demorar, avise o usuário para ligar na tomada).
+O idioma do bloco 1 vale para os seguintes da mesma live (`work/<id>-bN`). Não existe mais retranscrição.
+**Enquanto transcreve, rode a varredura de quadros junto** (passo 3.2, ~10 s): ela não atrapalha.
 
 ## Passo 3 — Achar candidatos: leitura + varredura de imagens (as duas fontes juntas)
 
@@ -206,9 +178,9 @@ do payoff (ou no gancho falado que leva a ele).
 
 Ponha todos os candidatos numa tabela (assunto, tipo, payoff e segundo, passa no "teste do corte bom"?) e
 compare **lado a lado**. Ordem: novidade do jogo com payoff na tela > opinião/nota > primeira vez com visual >
-reação forte/caos com desfecho > jogada/fail > zoeira. **Variedade:** no máximo 1 corte por assunto no link
-(confira também os blocos anteriores e `progress.py check`); misture tipos. Bloco fraco entrega menos; nunca
-complete com corte fraco. Rode `python scripts/progress.py check work/<id>` e descarte os repetidos.
+reação forte/caos com desfecho > jogada/fail > coisa inusitada > zoeira. **Leve todos os que se sustentam
+sozinhos** (pedido de 21/11/2026: o máximo de shorts, até o básico; o inusitado dá certo). Rode
+`python scripts/progress.py check work/<id>` e descarte só os repetidos (mesmo momento já cortado).
 
 **Início e fim perfeitos** (o short é postado sem editar; regras completas em `references/viral-rules.md`):
 - **Início:** no gancho, a primeira frase ou ação que já prende (nunca cumprimento, "então", "tipo", silêncio,
@@ -416,6 +388,14 @@ Quando o usuário manda o link junto com horários (ex.: "1:23:40", "1:23:40-1:2
 - Live no ar: só dá para cortar o que já passou; horário no futuro → avise e espere.
 - Resto igual: fetch_hd, make_shorts, organize, `progress.py done` e Notion (passo 8).
 
+## Clipe de gameplay chill (toda live, deitado)
+
+Além dos shorts, ~1 min tranquilo e bonito por live (pôr do sol, água, voo, cidade à noite), sem cutscene
+violenta e sem ação forte: baixe o trecho em alta (`download.py --section`, sem `--analysis`) e **copie sem
+recodificar** (`ffmpeg -i source.mp4 -c copy -movflags +faststart out.mp4`: 2 s, mesma qualidade; recodificar
+levava 6 min e dobrava o tamanho). Saída: `<shorts_root>/<streamer>/gameplay/NN_<NOME>.mp4`, 1920x1080, som
+original, sem gancho/legenda.
+
 ## Modo abertura (lançamento do jogo: "abertura" + link)
 
 Quando o usuário manda um link (Twitch ou YouTube, live no ar ou VOD) com a palavra **"abertura"** (ou pede "a
@@ -457,6 +437,23 @@ abrir o jogo + os melhores momentos dos primeiros 30 min de jogo**, rápido, sem
    a live inteira, a abertura e esses 30 min não são repetidos (e não sai uma segunda abertura).
 7. No fim de cada link, diga em uma linha: os shorts (gancho e arquivo) e, se a live continua, "Me mande o link
    de novo (sem "abertura") quando quiser o resto, que eu continuo de HH:MM:SS".
+
+## Compilado de melhores momentos (23/11/2026)
+
+Vídeo "MELHORES MOMENTOS <STREAMER> JOGANDO GTA VI / PT N", com legenda, layout cam 1/3, sem card de gancho.
+1. **Duração ~1 min:** juntar trechos engraçados (5-20 s; briga, xingamento, grito, KKKK, nada de fala solta)
+   até o primeiro que passa um pouco de 60 s e parar ali.
+2. Um subdir por trecho em `work/<id>-compN/mK` (hardlink de source/transcript/setup do bloco) com `clips.json`
+   de 1 clipe: `"card": false`, `"compilado": true` e, nos trechos de reação, `"zoom": [[ini, fim]]` (segundos
+   do clipe, ~1-2 s). Renderizar com `make_shorts.py mK`: o zoom (webcam em tela cheia) sai da fonte,
+   **centrado no rosto** (`scripts/face_center.py`, YuNet em `assets/face_yunet.onnx`, precisa
+   `opencv-python-headless<5`), e a legenda é desenhada por cima, inteira. Nunca dar zoom no short já
+   renderizado (corta a legenda). Zoom no rosto só nos compilados.
+3. **Abertura:** o vídeo começa com o trecho mais engraçado (3-7 s); no último quadro a imagem congela pelo
+   tamanho da vinheta (`assets/sting_compilado.wav`, 2,7 s, áudio oficial do usuário) com o título por cima:
+   `python scripts/make_compilado_title.py <STREAMER> <N> title.png` (magenta #E400EE + branco, contorno preto).
+4. Reencodar todos os pedaços igual (libx264 crf 18, 30 fps, aac 48 kHz, `-video_track_timescale 15360`),
+   concat com `-c copy` e salvar em `C:\cortes\shorts\<streamer>\compilados\MELHORES MOMENTOS <STREAMER> GTA VI PT N.mp4`.
 
 ## Gameplay solo (lançamento do GTA 6, 19/11/2026) e calibração
 
